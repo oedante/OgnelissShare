@@ -313,6 +313,122 @@ async fn resume_and_verify() {
     assert!(!stage.exists());
 }
 
+/// В ссылке для сообщений нет IP-адресов — устройство находится по записи
+/// в DNS. В тестах DNS нет, поэтому добавляем прямые адреса пригласившего.
+fn reachable(a: &Node, url: &str) -> String {
+    let mut link = crate::pairing::PairLink::parse(url).unwrap();
+    link.addrs = a.ep.addr().ip_addrs().copied().collect();
+    link.to_web_uri()
+}
+
+async fn join_result(node: &Node, what: &str) -> Value {
+    let mut ev = Vec::new();
+    wait_for(what, 15, || {
+        events(node, &mut ev);
+        ev.iter().any(|e| e["type"] == "join_result")
+    })
+    .await;
+    ev.into_iter().find(|e| e["type"] == "join_result").unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn message_link_pairs_after_confirmation() {
+    let (a, _) = make_node("A").await;
+    let (b, _) = make_node("B").await;
+    let (c, _) = make_node("C").await;
+
+    // Ссылка, которую перехватил чужой: A отказывает — ссылка сгорает.
+    let l1 = a.create_link(PairMode::Pair, vec![], false).unwrap();
+    let url1 = l1["url"].as_str().unwrap().to_string();
+    assert!(url1.starts_with(crate::pairing::WEB_PREFIX), "{url1}");
+    assert!(!url1.contains("&a="), "в ссылке для сообщений нет IP-адресов: {url1}");
+    c.use_invite(&reachable(&a, &url1)).unwrap();
+    wait_for("запрос от C", 10, || !a.snapshot()["requests"].as_array().unwrap().is_empty()).await;
+    let snap = a.snapshot();
+    assert_eq!(snap["requests"][0]["via_link"], true);
+    a.respond_pair(snap["requests"][0]["id"].as_str().unwrap(), false).unwrap();
+    let r = join_result(&c, "отказ C").await;
+    assert_eq!(r["ok"], false);
+    assert_eq!(r["error"], "declined", "{r}");
+    wait_for("ссылка сгорела", 10, || a.snapshot()["links"].as_array().unwrap().is_empty()).await;
+
+    // Настоящий адресат вставляет сообщение целиком; A сверяет код и подтверждает.
+    let l2 = a.create_link(PairMode::Pair, vec![], false).unwrap();
+    let url2 = l2["url"].as_str().unwrap();
+    let info = b.use_invite(&format!("Подключайся ко мне: {} — до завтра.", reachable(&a, url2))).unwrap();
+    assert_eq!(info["remote"], true);
+    wait_for("запрос от B", 10, || !a.snapshot()["requests"].as_array().unwrap().is_empty()).await;
+    let snap = a.snapshot();
+    let req = &snap["requests"][0];
+    assert_eq!(req["code"], info["code"], "коды на двух экранах совпадают");
+    a.respond_pair(req["id"].as_str().unwrap(), true).unwrap();
+    let r = join_result(&b, "итог B").await;
+    assert_eq!(r["ok"], true, "{r}");
+    let idb = b.id().to_string();
+    wait_for("связаны", 10, || peer_ids(&a).iter().any(|p| p.0 == idb && p.1 == "paired")).await;
+    assert!(a.snapshot()["links"].as_array().unwrap().is_empty(), "ссылка одноразовая");
+
+    // Повторно по израсходованной ссылке не войти.
+    let (d, _) = make_node("D").await;
+    d.use_invite(&reachable(&a, url2)).unwrap();
+    assert_eq!(join_result(&d, "вход D").await["ok"], false);
+
+    // Своё имя для связанного устройства — только у A.
+    a.rename_peer(&b.id(), "Телефон мамы").unwrap();
+    let p = a.snapshot()["peers"][0].clone();
+    assert_eq!(p["name"], "Телефон мамы");
+    assert_eq!(p["own_name"], b.name());
+    assert_eq!(p["renamed"], true);
+    a.rename_peer(&b.id(), "  ").unwrap();
+    let p = a.snapshot()["peers"][0].clone();
+    assert_eq!(p["name"], b.name());
+    assert_eq!(p["renamed"], false);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn files_by_link() {
+    let (a, base_a) = make_node("A").await;
+    let (b, base_b) = make_node("B").await;
+    let (c, base_c) = make_node("C").await;
+
+    let src = base_a.join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    std::fs::write(src.join("отчёт.pdf"), vec![5u8; 200_000]).unwrap();
+    // Как на телефоне: выбранный файл — временная копия, её забирает ссылка.
+    let link = a.create_link(PairMode::Files, vec![src.join("отчёт.pdf")], true).unwrap();
+    assert!(!src.join("отчёт.pdf").exists(), "копия перенесена в папку ссылки");
+    assert_eq!(link["count"], 1);
+    assert_eq!(link["names"][0], "отчёт.pdf");
+    let url = link["url"].as_str().unwrap().to_string();
+    let owned = base_a.join("data/links").join(link["id"].as_str().unwrap());
+    assert!(owned.exists());
+
+    // Ссылкой могут воспользоваться несколько получателей; каждый соглашается на приём.
+    for (node, base) in [(&b, &base_b), (&c, &base_c)] {
+        node.use_invite(&reachable(&a, &url)).unwrap();
+        assert_eq!(join_result(node, "вход по ссылке").await["ok"], true);
+        wait_for("вопрос «Принять?»", 15, || {
+            node.snapshot()["requests"].as_array().unwrap().iter().any(|r| r["kind"] == "offer")
+        })
+        .await;
+        let snap = node.snapshot();
+        let req = snap["requests"].as_array().unwrap().iter().find(|r| r["kind"] == "offer").unwrap();
+        assert_eq!(req["names"][0], "отчёт.pdf");
+        node.respond_offer(req["transfer"].as_str().unwrap(), true).unwrap();
+        wait_for("файл получен", 15, || base.join("dl/отчёт.pdf").exists()).await;
+        assert_eq!(std::fs::read(base.join("dl/отчёт.pdf")).unwrap(), vec![5u8; 200_000]);
+    }
+    assert_eq!(a.snapshot()["links"][0]["uses"], 2);
+
+    // Отозванная ссылка больше не работает, копии файлов удалены.
+    a.revoke_link(link["id"].as_str().unwrap()).unwrap();
+    assert!(a.snapshot()["links"].as_array().unwrap().is_empty());
+    wait_for("копии удалены", 10, || !owned.exists()).await;
+    let (d, _) = make_node("D").await;
+    d.use_invite(&reachable(&a, &url)).unwrap();
+    assert_eq!(join_result(&d, "вход по отозванной ссылке").await["ok"], false);
+}
+
 #[test]
 fn ffi_commands_work() {
     use std::ffi::{CStr, CString};

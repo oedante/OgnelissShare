@@ -1122,7 +1122,7 @@ fn recv_err(e: anyhow::Error) -> RecvErr {
 
 // ---------------------------------------------------------------- файлы
 
-fn display_name(p: &Path) -> String {
+pub(crate) fn display_name(p: &Path) -> String {
     match p.file_name() {
         Some(n) => n.to_string_lossy().into_owned(),
         None => p.to_string_lossy().trim_end_matches(['/', '\\']).to_string(),

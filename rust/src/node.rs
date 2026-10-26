@@ -3,14 +3,16 @@
 //!
 //! Главное правило безопасности: входящее соединение принимается, только
 //! если ключ собеседника есть в списке связанных устройств или разовых
-//! сеансов. Исключение — пока на экране показан QR-код: тогда несколько
-//! неизвестных устройств могут подключиться, но им разрешено ровно одно
-//! действие — предъявить секрет из этого кода в течение 10 секунд.
-//! Всё остальное отклоняется ещё на этапе рукопожатия (код 403), поэтому
-//! посторонний не может ни прислать файл, ни узнать, что здесь кто-то есть.
+//! сеансов. Исключение — пока показан QR-код или действует ссылка-
+//! приглашение: тогда несколько неизвестных устройств могут подключиться,
+//! но им разрешено ровно одно действие — предъявить секрет из кода или
+//! ссылки в течение 10 секунд. Всё остальное отклоняется ещё на этапе
+//! рукопожатия (код 403), поэтому посторонний не может ни прислать файл,
+//! ни узнать, что здесь кто-то есть. Найти устройство без его ключа нельзя
+//! вовсе: ключ есть только в коде или ссылке.
 
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
@@ -20,6 +22,7 @@ use iroh::endpoint::{
     AfterHandshakeOutcome, Connection, ConnectionError, EndpointHooks, RecvStream, SendStream, Side, VarInt,
     presets,
 };
+use iroh::address_lookup::{DnsAddressLookup, PkarrPublisher, PkarrResolver};
 use iroh::{Endpoint, EndpointAddr, EndpointId, RelayMode, RelayUrl, Watcher};
 use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
@@ -27,10 +30,10 @@ use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 
 use crate::events::Events;
-use crate::pairing::{PairLink, PairMode, decode_token, pair_code};
+use crate::pairing::{PairLink, PairMode, decode_token, encode_token, pair_code};
 use crate::proto::{ALPN, CODE_BUSY, CODE_NOT_PAIRED, CODE_REMOVED, Msg, read_msg, write_msg};
-use crate::store::{PeerRecord, Saved, Store};
-use crate::transfer::Transfer;
+use crate::store::{LinkInvite, PeerRecord, Saved, Store};
+use crate::transfer::{Transfer, display_name};
 use crate::util::{clean_name, clean_platform, ct_eq, now_unix, random_id, short_code};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -39,6 +42,13 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const INVITE_TTL: Duration = Duration::from_secs(5 * 60);
 /// Сколько ждём решения «Подключить?» на показывающем устройстве.
 const PAIR_DECISION_TTL: Duration = Duration::from_secs(120);
+/// Сколько живёт ссылка-приглашение для сообщений (почта, мессенджер).
+const LINK_TTL: Duration = Duration::from_secs(24 * 60 * 60);
+/// Решения «Подключить?» по ссылке ждём дольше: пригласивший может быть
+/// не у экрана.
+const LINK_DECISION_TTL: Duration = Duration::from_secs(10 * 60);
+/// Не больше стольких действующих ссылок.
+const MAX_LINKS: usize = 20;
 /// Разовый сеанс без действий закрывается сам.
 const SESSION_IDLE: Duration = Duration::from_secs(30 * 60);
 /// Разовый сеанс без соединения убирается из списка через это время.
@@ -103,7 +113,7 @@ pub struct Config {
 #[derive(Debug, Default)]
 struct Gate {
     allowed: RwLock<HashSet<EndpointId>>,
-    /// До какого момента показан QR-код.
+    /// До какого момента действует QR-код или ссылка-приглашение.
     open_until: Mutex<Option<Instant>>,
     guests: AtomicUsize,
 }
@@ -233,6 +243,18 @@ pub(crate) struct PairRequest {
     pub code: String,
     pub reply: Option<oneshot::Sender<bool>>,
     pub created: Instant,
+    /// Подключаются по ссылке из сообщения (а не по QR-коду рядом).
+    pub via_link: bool,
+    /// Сколько ждём решения.
+    pub ttl: Duration,
+}
+
+/// Чем гость доказал, что его пригласили.
+enum Ticket {
+    /// Секрет показанного QR-кода.
+    Qr { mode: PairMode, token: [u8; 16] },
+    /// Секрет ссылки из сообщения; для «files» — что отправить.
+    Link { id: String, mode: PairMode, token: [u8; 16], files: Vec<PathBuf> },
 }
 
 pub(crate) struct State {
@@ -247,6 +269,8 @@ pub(crate) struct State {
     /// Соединения, по которым идут передачи (stable_id → число передач):
     /// такие не закрываем при уборке дублей.
     pub busy_conns: HashMap<usize, u32>,
+    /// Одноразовые ссылки, по которым сейчас ждут решения «Подключить?».
+    pub link_busy: HashSet<String>,
 }
 
 impl State {
@@ -262,7 +286,7 @@ impl State {
 
     pub fn peer_name(&self, id: &EndpointId) -> String {
         if let Some(p) = self.saved.peers.iter().find(|p| &p.id == id) {
-            return p.name.clone();
+            return p.display_name().to_string();
         }
         if let Some(s) = self.sessions.get(id) {
             return s.name.clone();
@@ -312,7 +336,15 @@ impl Node {
             .alpns(vec![ALPN.to_vec()])
             .hooks(GateHook(gate.clone()));
         builder = match &cfg.relays {
-            Relays::Default => builder.relay_mode(RelayMode::Default),
+            // Где устройство сейчас: подписанная его ключом запись «ключ →
+            // ретранслятор» в общедоступном DNS n0 (IP-адресов в ней нет).
+            // По ней связанные устройства находят друг друга, даже если оба
+            // сменили ретранслятор (переезд, другая страна).
+            Relays::Default => builder
+                .relay_mode(RelayMode::Default)
+                .address_lookup(PkarrPublisher::n0_dns())
+                .address_lookup(PkarrResolver::n0_dns())
+                .address_lookup(DnsAddressLookup::n0_dns()),
             Relays::Custom(urls) => builder.relay_mode(RelayMode::custom(urls.clone())),
             Relays::Disabled => builder.relay_mode(RelayMode::Disabled),
         };
@@ -355,6 +387,7 @@ impl Node {
                 transfers: Vec::new(),
                 active: true,
                 busy_conns: HashMap::new(),
+                link_busy: HashSet::new(),
             }),
             cancel: CancellationToken::new(),
             kick: Notify::new(),
@@ -368,6 +401,8 @@ impl Node {
             VERSION,
             node.cfg.relays.label()
         ));
+        // Ссылки-приглашения, созданные до перезапуска, по-прежнему действуют.
+        node.refresh_gate();
         tokio::spawn(node.clone().accept_loop());
         tokio::spawn(node.clone().presence_loop());
         tokio::spawn(node.clone().watch_network());
@@ -851,15 +886,31 @@ impl Node {
 
     fn housekeeping(&self) {
         let now = Instant::now();
+        let unix = now_unix();
         let mut changed = false;
         let mut closed_sessions = Vec::new();
+        let mut expired_links = Vec::new();
         self.with(|s| {
             if s.invite.as_ref().is_some_and(|i| i.expires <= now) {
                 s.invite = None;
                 changed = true;
             }
+            // Истёкшие ссылки — долой; копии файлов удаляются, когда по ним
+            // уже ничего не отправляется.
+            let sending: Vec<PathBuf> = s
+                .transfers
+                .iter()
+                .filter(|t| !t.is_finished())
+                .flat_map(|t| t.paths.iter().cloned())
+                .collect();
+            let mut keep = Vec::new();
+            for l in std::mem::take(&mut s.saved.invites) {
+                let in_use = l.owned_dir.as_ref().is_some_and(|d| sending.iter().any(|p| p.starts_with(d)));
+                if l.expires <= unix && !in_use { expired_links.push(l) } else { keep.push(l) }
+            }
+            s.saved.invites = keep;
             let before = s.pair_requests.len();
-            s.pair_requests.retain(|r| now.duration_since(r.created) < PAIR_DECISION_TTL);
+            s.pair_requests.retain(|r| now.duration_since(r.created) < r.ttl);
             changed |= before != s.pair_requests.len();
             let active_peers: HashSet<EndpointId> =
                 s.transfers.iter().filter(|t| !t.is_finished()).map(|t| t.peer).collect();
@@ -881,8 +932,12 @@ impl Node {
                 changed = true;
             }
         });
-        let open = self.with(|s| s.invite.as_ref().map(|i| i.expires));
-        self.gate.open(open);
+        if !expired_links.is_empty() {
+            changed = true;
+            self.drop_link_files(expired_links);
+            self.save();
+        }
+        self.refresh_gate();
         if !closed_sessions.is_empty() {
             self.sync_gate();
             for c in closed_sessions {
@@ -935,15 +990,158 @@ impl Node {
         let token: [u8; 16] = rand::random();
         let expires = Instant::now() + INVITE_TTL;
         self.with(|s| s.invite = Some(Invite { mode, token, expires, joined: None }));
-        self.gate.open(Some(expires));
+        self.refresh_gate();
         self.events.changed();
         self.invite_json().unwrap_or(Value::Null)
     }
 
     pub fn cancel_invite(&self) {
         self.with(|s| s.invite = None);
-        self.gate.open(None);
+        self.refresh_gate();
         self.events.changed();
+    }
+
+    /// Гостей пускаем, пока показан QR-код или действует хоть одна ссылка.
+    fn refresh_gate(&self) {
+        let until = self.with(|s| {
+            let now = Instant::now();
+            let unix = now_unix();
+            let qr = s.invite.as_ref().map(|i| i.expires);
+            let link = s
+                .saved
+                .invites
+                .iter()
+                .map(|l| l.expires)
+                .filter(|&e| e > unix)
+                .max()
+                .map(|e| now + Duration::from_secs(e - unix));
+            qr.into_iter().chain(link).max()
+        });
+        self.gate.open(until);
+    }
+
+    // ------------------------------------------------------------ ссылки
+
+    /// Ссылка для сообщения (почта, мессенджер): «Моё устройство» и разовый
+    /// обмен — одноразовые, «Файлы по ссылке» — для всех, у кого она есть,
+    /// пока не истечёт или её не отзовут. `take_files` — это временные копии
+    /// (телефоны): перенести их в папку ссылки, чтобы дожили до её конца.
+    pub fn create_link(&self, mode: PairMode, paths: Vec<PathBuf>, take_files: bool) -> Result<Value> {
+        if self.with(|s| s.saved.invites.len()) >= MAX_LINKS {
+            bail!("busy");
+        }
+        let id = random_id();
+        let (files, owned_dir) = if mode == PairMode::Files {
+            if paths.is_empty() {
+                bail!("empty");
+            }
+            if paths.iter().any(|p| !p.exists()) {
+                bail!("read");
+            }
+            if take_files {
+                let dir = self.cfg.data_dir.join("links").join(&id);
+                let moved = take_into(&dir, &paths).context("storage")?;
+                (moved, Some(dir))
+            } else {
+                (paths, None)
+            }
+        } else {
+            (Vec::new(), None)
+        };
+        let token: [u8; 16] = rand::random();
+        let created = now_unix();
+        let invite = LinkInvite {
+            id,
+            mode: mode.as_str().to_string(),
+            token: encode_token(&token),
+            created,
+            expires: created + LINK_TTL.as_secs(),
+            files,
+            owned_dir,
+            uses: 0,
+        };
+        self.with(|s| s.saved.invites.push(invite.clone()));
+        self.save();
+        self.refresh_gate();
+        self.events.log(format!("link {} {}", invite.id, invite.mode));
+        self.events.changed();
+        Ok(self.link_json(&invite))
+    }
+
+    /// Отозвать ссылку: по ней больше никто не подключится.
+    pub fn revoke_link(&self, id: &str) -> Result<()> {
+        let removed = self.with(|s| {
+            let pos = s.saved.invites.iter().position(|l| l.id == id)?;
+            Some(s.saved.invites.remove(pos))
+        });
+        let Some(link) = removed else { bail!("not_found") };
+        self.drop_link_files(vec![link]);
+        self.save();
+        self.refresh_gate();
+        self.events.changed();
+        Ok(())
+    }
+
+    fn drop_link_files(&self, links: Vec<LinkInvite>) {
+        let dirs: Vec<PathBuf> = links.into_iter().filter_map(|l| l.owned_dir).collect();
+        if !dirs.is_empty() {
+            tokio::task::spawn_blocking(move || {
+                for d in dirs {
+                    let _ = std::fs::remove_dir_all(d);
+                }
+            });
+        }
+    }
+
+    fn message_link(&self, mode: PairMode, token: [u8; 16], expires: u64) -> PairLink {
+        PairLink {
+            mode,
+            id: self.id(),
+            token,
+            name: self.name(),
+            platform: self.cfg.platform.clone(),
+            // Прямые адреса в сообщение не кладём: в переписке им не место,
+            // а нужны они только в одной сети. Ретранслятор — для скорости,
+            // иначе устройство найдётся по записи в DNS.
+            relay: self.ep.addr().relay_urls().next().cloned(),
+            addrs: Vec::new(),
+            remote: true,
+            expires,
+        }
+    }
+
+    fn link_json(&self, l: &LinkInvite) -> Value {
+        let mode = PairMode::parse(&l.mode).unwrap_or(PairMode::Once);
+        let url = decode_token(&l.token).map(|t| self.message_link(mode, t, l.expires).to_web_uri());
+        json!({
+            "id": l.id,
+            "mode": l.mode,
+            "url": url.unwrap_or_default(),
+            "created": l.created,
+            "expires": l.expires,
+            "uses": l.uses,
+            "count": l.files.len(),
+            "names": l.files.iter().take(3).map(|p| display_name(p)).collect::<Vec<_>>(),
+        })
+    }
+
+    /// Своё имя для связанного устройства (видно только здесь). Пустое —
+    /// снова имя, которое сообщает само устройство.
+    pub fn rename_peer(&self, id: &EndpointId, name: &str) -> Result<()> {
+        let alias = clean_name(name);
+        let found = self.with(|s| match s.saved.peers.iter_mut().find(|p| &p.id == id) {
+            Some(p) => {
+                p.alias = if alias == p.name { String::new() } else { alias };
+                true
+            }
+            None => false,
+        });
+        if !found {
+            bail!("not_found");
+        }
+        self.save();
+        self.events.changed();
+        Ok(())
     }
 
     fn invite_link(&self, mode: PairMode, token: [u8; 16]) -> PairLink {
@@ -956,6 +1154,8 @@ impl Node {
             platform: self.cfg.platform.clone(),
             relay: addr.relay_urls().next().cloned(),
             addrs: addr.ip_addrs().copied().take(6).collect(),
+            remote: false,
+            expires: 0,
         }
     }
 
@@ -988,6 +1188,9 @@ impl Node {
         if link.id == self.id() {
             bail!("own_link");
         }
+        if link.expires > 0 && link.expires <= now_unix() {
+            bail!("expired");
+        }
         let code = pair_code(&link.id, &self.id(), &link.token);
         let info = json!({
             "peer": link.id.to_string(),
@@ -995,6 +1198,8 @@ impl Node {
             "platform": link.platform,
             "mode": link.mode.as_str(),
             "code": code,
+            "remote": link.remote,
+            "expires": link.expires,
         });
         let node = self.clone();
         tokio::spawn(async move {
@@ -1036,7 +1241,8 @@ impl Node {
             )
             .await?;
             send.finish()?;
-            match timeout(PAIR_DECISION_TTL + Duration::from_secs(30), read_msg(&mut recv)).await {
+            let wait = if link.remote { LINK_DECISION_TTL } else { PAIR_DECISION_TTL };
+            match timeout(wait + Duration::from_secs(30), read_msg(&mut recv)).await {
                 Ok(r) => r,
                 Err(_) => bail!("timeout"),
             }
@@ -1057,7 +1263,7 @@ impl Node {
                 let name = clean_name(&name);
                 match link.mode {
                     PairMode::Pair => self.add_paired(link.id, &name, &platform),
-                    PairMode::Once => self.add_session(link.id, &name, &platform),
+                    PairMode::Once | PairMode::Files => self.add_session(link.id, &name, &platform),
                 }
                 self.adopt(conn.clone());
                 let _ = self.say_hello(&conn).await;
@@ -1071,7 +1277,8 @@ impl Node {
         }
     }
 
-    /// Неизвестное устройство подключилось, пока показан QR-код.
+    /// Неизвестное устройство подключилось, пока показан QR-код или
+    /// действует ссылка-приглашение.
     async fn serve_guest(self: Arc<Self>, conn: Connection) {
         let count = self.gate.guests.fetch_add(1, Ordering::SeqCst) + 1;
         let _slot = GuestSlot(&self.gate.guests);
@@ -1098,24 +1305,41 @@ impl Node {
         let presented = decode_token(&token).ok();
         let wanted = PairMode::parse(&mode);
 
-        // Код одноразовый: первый, кто его предъявил, его и забирает.
-        let accepted = self.with(|s| match (&mut s.invite, presented) {
-            (Some(inv), Some(tok))
-                if inv.expires > Instant::now()
-                    && inv.joined.is_none()
-                    && Some(inv.mode) == wanted
-                    && ct_eq(&inv.token, &tok) =>
+        let ticket = self.with(|s| -> Option<Ticket> {
+            let tok = presented?;
+            let wanted = wanted?;
+            // QR-код одноразовый: первый, кто его предъявил, его и забирает.
+            if let Some(inv) = s.invite.as_mut()
+                && inv.expires > Instant::now()
+                && inv.joined.is_none()
+                && inv.mode == wanted
+                && ct_eq(&inv.token, &tok)
             {
                 inv.joined = Some(Joined {
                     name: name.clone(),
                     platform: platform.clone(),
                     state: if inv.mode == PairMode::Pair { "pending" } else { "done" },
                 });
-                Some((inv.mode, inv.token))
+                return Some(Ticket::Qr { mode: inv.mode, token: inv.token });
             }
-            _ => None,
+            let unix = now_unix();
+            let (id, files) = s
+                .saved
+                .invites
+                .iter()
+                .find(|l| {
+                    l.expires > unix
+                        && PairMode::parse(&l.mode) == Some(wanted)
+                        && decode_token(&l.token).is_ok_and(|t| ct_eq(&t, &tok))
+                })
+                .map(|l| (l.id.clone(), l.files.clone()))?;
+            // Одноразовую ссылку, по которой уже ждут решения, второй раз не даём.
+            if wanted != PairMode::Files && !s.link_busy.insert(id.clone()) {
+                return None;
+            }
+            Some(Ticket::Link { id, mode: wanted, token: tok, files })
         });
-        let Some((mode, tok)) = accepted else {
+        let Some(ticket) = ticket else {
             let _ = write_msg(&mut send, &Msg::PairDenied { reason: "expired".into() }).await;
             let _ = send.finish();
             let _ = timeout(Duration::from_secs(2), send.stopped()).await;
@@ -1123,11 +1347,17 @@ impl Node {
             return;
         };
         self.events.changed();
+        let (mode, tok, via_link) = match &ticket {
+            Ticket::Qr { mode, token } => (*mode, *token, false),
+            Ticket::Link { mode, token, .. } => (*mode, *token, true),
+        };
 
-        let approved = match mode {
-            PairMode::Once => true,
+        // Some(true) — подключаем, Some(false) — отказ, None — не дождались.
+        let decision = match mode {
+            PairMode::Once | PairMode::Files => Some(true),
             PairMode::Pair => {
                 let code = pair_code(&self.id(), &peer, &tok);
+                let ttl = if via_link { LINK_DECISION_TTL } else { PAIR_DECISION_TTL };
                 let (tx, rx) = oneshot::channel();
                 let req_id = random_id();
                 self.with(|s| {
@@ -1139,44 +1369,77 @@ impl Node {
                         code: code.clone(),
                         reply: Some(tx),
                         created: Instant::now(),
+                        via_link,
+                        ttl,
                     })
                 });
                 self.events.emit(json!({
                     "type": "pair_request", "id": req_id, "peer": peer.to_string(),
-                    "name": name, "platform": platform, "code": code,
+                    "name": name, "platform": platform, "code": code, "via_link": via_link,
                 }));
                 let decision = tokio::select! {
-                    r = timeout(PAIR_DECISION_TTL, rx) => matches!(r, Ok(Ok(true))),
-                    _ = conn.closed() => false,
+                    r = timeout(ttl, rx) => match r {
+                        Ok(Ok(v)) => Some(v),
+                        _ => None,
+                    },
+                    _ = conn.closed() => None,
                 };
                 self.with(|s| s.pair_requests.retain(|r| r.id != req_id));
                 decision
             }
         };
+        let approved = decision == Some(true);
+
+        // Одноразовая ссылка израсходована — и при отказе тоже: значит, её
+        // получил не тот, кому она предназначалась. Не дождались ответа —
+        // ссылка остаётся, можно попробовать ещё раз.
+        if let Ticket::Link { id, mode, .. } = &ticket {
+            let used = self.with(|s| {
+                s.link_busy.remove(id);
+                if *mode == PairMode::Files {
+                    if approved && let Some(l) = s.saved.invites.iter_mut().find(|l| &l.id == id) {
+                        l.uses = l.uses.saturating_add(1);
+                    }
+                    return None;
+                }
+                // Не дождались ответа — ссылка остаётся.
+                decision?;
+                let pos = s.saved.invites.iter().position(|l| &l.id == id)?;
+                Some(s.saved.invites.remove(pos))
+            });
+            if let Some(link) = used {
+                self.drop_link_files(vec![link]);
+            }
+            self.save();
+            self.refresh_gate();
+        }
 
         if !approved {
             self.with(|s| {
-                if let Some(j) = s.invite.as_mut().and_then(|i| i.joined.as_mut()) {
+                if !via_link && let Some(j) = s.invite.as_mut().and_then(|i| i.joined.as_mut()) {
                     j.state = "declined";
                 }
             });
             self.events.changed();
-            let _ = write_msg(&mut send, &Msg::PairDenied { reason: "declined".into() }).await;
+            let reason = if decision.is_none() { "timeout" } else { "declined" };
+            let _ = write_msg(&mut send, &Msg::PairDenied { reason: reason.into() }).await;
             let _ = send.finish();
             let _ = timeout(Duration::from_secs(2), send.stopped()).await;
-            conn.close(VarInt::from_u32(0), b"declined");
+            conn.close(VarInt::from_u32(0), reason.as_bytes());
             return;
         }
 
         match mode {
             PairMode::Pair => self.add_paired(peer, &name, &platform),
-            PairMode::Once => self.add_session(peer, &name, &platform),
+            PairMode::Once | PairMode::Files => self.add_session(peer, &name, &platform),
         }
-        self.with(|s| {
-            if let Some(j) = s.invite.as_mut().and_then(|i| i.joined.as_mut()) {
-                j.state = "done";
-            }
-        });
+        if !via_link {
+            self.with(|s| {
+                if let Some(j) = s.invite.as_mut().and_then(|i| i.joined.as_mut()) {
+                    j.state = "done";
+                }
+            });
+        }
         let ok = Msg::PairOk { name: self.name(), platform: self.cfg.platform.clone() };
         if write_msg(&mut send, &ok).await.is_err() {
             return;
@@ -1184,8 +1447,16 @@ impl Node {
         let _ = send.finish();
         self.events.emit(json!({
             "type": "joined", "peer": peer.to_string(), "name": name, "mode": mode.as_str(),
+            "via": if via_link { "link" } else { "qr" },
         }));
         self.adopt(conn);
+        // Файлы по ссылке уходят сами; получатель подтверждает приём.
+        if let Ticket::Link { files, .. } = ticket
+            && !files.is_empty()
+            && let Err(e) = self.send_files(peer, files)
+        {
+            self.events.log(format!("link files: {e:#}"));
+        }
     }
 
     /// Ответ на «Подключить устройство?».
@@ -1218,6 +1489,7 @@ impl Node {
                     added: now,
                     last_seen: now,
                     addr: None,
+                    alias: String::new(),
                 }),
             }
         });
@@ -1310,7 +1582,10 @@ impl Node {
                 peers.push(json!({
                     "id": p.id.to_string(),
                     "code": short_code(&p.id),
-                    "name": p.name,
+                    "name": p.display_name(),
+                    // Как устройство называет себя само (если дали своё имя).
+                    "own_name": p.name,
+                    "renamed": !p.alias.is_empty(),
                     "platform": p.platform,
                     "kind": "paired",
                     "online": online,
@@ -1342,6 +1617,7 @@ impl Node {
                     json!({
                         "id": r.id, "kind": "pair", "peer": r.peer.to_string(),
                         "name": r.name, "platform": r.platform, "code": r.code,
+                        "via_link": r.via_link,
                     })
                 })
                 .collect();
@@ -1349,14 +1625,40 @@ impl Node {
             let transfers: Vec<Value> = s.transfers.iter().rev().map(|t| t.to_json()).collect();
             (peers, requests, transfers)
         });
+        let invites: Vec<LinkInvite> = self.with(|s| s.saved.invites.clone());
+        let links: Vec<Value> = invites.iter().rev().map(|l| self.link_json(l)).collect();
         json!({
             "me": me,
             "peers": peers,
             "invite": self.invite_json(),
             "requests": requests,
             "transfers": transfers,
+            "links": links,
         })
     }
+}
+
+/// Перенести файлы в папку ссылки (переименованием, а если нельзя —
+/// копией). Папки и файлы, которых нет на месте, не трогаем.
+fn take_into(dir: &Path, paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
+    std::fs::create_dir_all(dir)?;
+    let mut out = Vec::with_capacity(paths.len());
+    for (i, src) in paths.iter().enumerate() {
+        if !src.is_file() {
+            out.push(src.clone());
+            continue;
+        }
+        // Своя подпапка на каждый файл: одинаковые имена не конфликтуют,
+        // а получатель увидит исходное имя.
+        let slot = dir.join(i.to_string());
+        std::fs::create_dir_all(&slot)?;
+        let dest = slot.join(src.file_name().unwrap_or_else(|| std::ffi::OsStr::new("file")));
+        if std::fs::rename(src, &dest).is_err() {
+            std::fs::copy(src, &dest)?;
+        }
+        out.push(dest);
+    }
+    Ok(out)
 }
 
 /// Пауза перед новой попыткой связаться: 5, 10, 20, 40, 60 секунд с разбросом.

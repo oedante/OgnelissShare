@@ -2,8 +2,10 @@
 //!
 //! - `identity.key` — 32 байта секретного ключа Ed25519. Создаётся при первом
 //!   запуске и никуда не передаётся; открытый ключ из него — адрес устройства.
-//! - `state.json` — имя устройства и «Мои устройства». Записывается атомарно
-//!   (временный файл и переименование), чтобы сбой не испортил список.
+//! - `state.json` — имя устройства, «Мои устройства» и действующие ссылки-
+//!   приглашения (с их секретами, поэтому доступ — только владельцу).
+//!   Записывается атомарно (временный файл и переименование), чтобы сбой не
+//!   испортил список.
 
 use std::fs;
 use std::io::Write;
@@ -29,6 +31,40 @@ pub struct PeerRecord {
     /// Последний известный адрес: ретранслятор и прямые адреса.
     #[serde(default)]
     pub addr: Option<EndpointAddr>,
+    /// Имя, которое дал этому устройству владелец (видно только здесь);
+    /// пустое — имя, которое сообщает само устройство.
+    #[serde(default)]
+    pub alias: String,
+}
+
+impl PeerRecord {
+    /// Имя для показа: своё, если задано, иначе то, что сообщило устройство.
+    pub fn display_name(&self) -> &str {
+        if self.alias.is_empty() { &self.name } else { &self.alias }
+    }
+}
+
+/// Ссылка-приглашение для сообщений (почта, мессенджер): живёт сутки и
+/// переживает перезапуск приложения.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LinkInvite {
+    pub id: String,
+    /// pair — «Моё устройство», once — разовый обмен, files — файлы по ссылке.
+    pub mode: String,
+    /// Секрет ссылки (base32).
+    pub token: String,
+    pub created: u64,
+    /// Секунды Unix.
+    pub expires: u64,
+    /// Файлы для «files».
+    #[serde(default)]
+    pub files: Vec<PathBuf>,
+    /// Папка, куда перенесены копии файлов (телефоны), — удаляется вместе со ссылкой.
+    #[serde(default)]
+    pub owned_dir: Option<PathBuf>,
+    /// Сколько раз по ссылке получили файлы.
+    #[serde(default)]
+    pub uses: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -43,6 +79,9 @@ pub struct Saved {
     /// Папка для полученных файлов, если пользователь выбрал свою.
     #[serde(default)]
     pub download_dir: String,
+    /// Действующие ссылки-приглашения.
+    #[serde(default)]
+    pub invites: Vec<LinkInvite>,
 }
 
 #[derive(Clone)]
@@ -96,7 +135,8 @@ impl Store {
         let mut s = saved.clone();
         s.version = 1;
         let body = serde_json::to_vec_pretty(&s)?;
-        write_atomic(&self.dir.join(STATE_FILE), &body, false)
+        // В файле секреты ссылок — права только у владельца.
+        write_atomic(&self.dir.join(STATE_FILE), &body, true)
     }
 }
 
@@ -144,6 +184,17 @@ mod tests {
                 added: 1,
                 last_seen: 2,
                 addr: Some(EndpointAddr::new(peer)),
+                alias: "Телефон мамы".into(),
+            }],
+            invites: vec![LinkInvite {
+                id: "a1".into(),
+                mode: "files".into(),
+                token: "secret".into(),
+                created: 1,
+                expires: 2,
+                files: vec![PathBuf::from("/tmp/a.txt")],
+                owned_dir: None,
+                uses: 0,
             }],
         };
         store.save_state(&saved).unwrap();
@@ -151,6 +202,12 @@ mod tests {
         assert_eq!(back.name, "Мой ноутбук");
         assert_eq!(back.peers.len(), 1);
         assert_eq!(back.peers[0].id, peer);
+        assert_eq!(back.peers[0].display_name(), "Телефон мамы");
+        assert_eq!(back.invites.len(), 1);
+        assert_eq!(back.invites[0].files, vec![PathBuf::from("/tmp/a.txt")]);
+        // Старый файл без новых полей читается.
+        fs::write(dir.join(STATE_FILE), br#"{"name":"x","peers":[]}"#).unwrap();
+        assert!(store.load_state().invites.is_empty());
 
         fs::write(dir.join(STATE_FILE), b"{oops").unwrap();
         assert!(store.load_state().peers.is_empty());

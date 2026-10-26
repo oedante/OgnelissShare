@@ -1,15 +1,23 @@
-//! Ссылка сопряжения в QR-коде и проверочный код.
+//! Ссылка сопряжения (QR-код или сообщение) и проверочный код.
 //!
 //! Формат: `ogshare://pair?v=1&m=p&id=<ключ>&t=<секрет>&n=<имя>&p=<платформа>&r=<ретранслятор>&a=<адреса>`
 //!
-//! - `m` — `p` (постоянная связь «мои устройства») или `o` (разовый обмен);
-//! - `id` — открытый ключ показывающего устройства (z-base-32);
-//! - `t` — одноразовый секрет из 16 случайных байт, живёт несколько минут;
-//! - `n`, `r`, `a` — имя, адрес ретранслятора и прямые адреса в base64url.
+//! - `m` — `p` (постоянная связь «мои устройства»), `o` (разовый обмен) или
+//!   `f` (файлы по ссылке: разовый обмен, файлы приходят сами);
+//! - `id` — открытый ключ пригласившего устройства (z-base-32);
+//! - `t` — секрет из 16 случайных байт;
+//! - `n`, `r`, `a` — имя, адрес ретранслятора и прямые адреса в base64url;
+//! - `l=1` — ссылка из сообщения (почта, мессенджер): живёт сутки, прямых
+//!   адресов в ней нет, а ответа пригласившего ждём дольше;
+//! - `e` — до какого момента действует (секунды Unix), для подсказки.
+//!
+//! В сообщениях та же строка идёт после `#` в `https://ogneliss.ru/share/join/#…`:
+//! такая ссылка кликабельна в любом мессенджере, а часть после `#` браузер
+//! на сервер не отправляет — сайт её не видит.
 //!
 //! Ключ в ссылке защищает от подмены: соединение устанавливается только с
 //! владельцем этого ключа (TLS 1.3 с проверкой ключа). Секрет защищает
-//! показывающего: без него к нему нельзя подключиться.
+//! пригласившего: без него к нему нельзя подключиться.
 
 use std::net::SocketAddr;
 
@@ -18,6 +26,12 @@ use data_encoding::{BASE32_NOPAD, BASE64URL_NOPAD};
 use iroh::{EndpointAddr, EndpointId, RelayUrl, TransportAddr};
 
 pub const SCHEME: &str = "ogshare://pair?";
+/// Ссылка для сообщений: страница сайта открывает приложение. Отдельный
+/// путь /share/join/ — чтобы приложение перехватывало только приглашения,
+/// а страницы сайта (описание, политика) открывались в браузере.
+pub const WEB_PREFIX: &str = "https://ogneliss.ru/share/join/#";
+/// Как узнать ссылку в тексте (после этих меток — параметры).
+const MARKERS: &[&str] = &[SCHEME, "ogneliss.ru/share/join/#", "ogneliss.ru/share/join#"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PairMode {
@@ -25,6 +39,8 @@ pub enum PairMode {
     Pair,
     /// Разовый обмен: временная связь на один сеанс.
     Once,
+    /// Файлы по ссылке: разовый обмен, пригласивший сразу отправляет файлы.
+    Files,
 }
 
 impl PairMode {
@@ -32,6 +48,7 @@ impl PairMode {
         match self {
             PairMode::Pair => "pair",
             PairMode::Once => "once",
+            PairMode::Files => "files",
         }
     }
 
@@ -39,6 +56,7 @@ impl PairMode {
         match s {
             "pair" | "p" => Some(PairMode::Pair),
             "once" | "o" => Some(PairMode::Once),
+            "files" | "f" => Some(PairMode::Files),
             _ => None,
         }
     }
@@ -47,6 +65,7 @@ impl PairMode {
         match self {
             PairMode::Pair => "p",
             PairMode::Once => "o",
+            PairMode::Files => "f",
         }
     }
 }
@@ -60,6 +79,10 @@ pub struct PairLink {
     pub platform: String,
     pub relay: Option<RelayUrl>,
     pub addrs: Vec<SocketAddr>,
+    /// Ссылка из сообщения, а не с экрана рядом.
+    pub remote: bool,
+    /// До какого момента действует (секунды Unix); 0 — не указано.
+    pub expires: u64,
 }
 
 impl PairLink {
@@ -78,10 +101,20 @@ impl PairLink {
         EndpointAddr::from_parts(self.id, list)
     }
 
+    /// Для QR-кода и копирования: `ogshare://pair?…`.
     pub fn to_uri(&self) -> String {
+        format!("{SCHEME}{}", self.query())
+    }
+
+    /// Для сообщений: `https://ogneliss.ru/share/join/#…`.
+    pub fn to_web_uri(&self) -> String {
+        format!("{WEB_PREFIX}{}", self.query())
+    }
+
+    fn query(&self) -> String {
         let addrs: Vec<String> = self.addrs.iter().map(|a| a.to_string()).collect();
-        let mut uri = format!(
-            "{SCHEME}v=1&m={}&id={}&t={}&n={}&p={}",
+        let mut q = format!(
+            "v=1&m={}&id={}&t={}&n={}&p={}",
             self.mode.letter(),
             self.id.to_z32(),
             self.token_str(),
@@ -89,19 +122,35 @@ impl PairLink {
             self.platform,
         );
         if let Some(r) = &self.relay {
-            uri.push_str("&r=");
-            uri.push_str(&BASE64URL_NOPAD.encode(r.to_string().as_bytes()));
+            q.push_str("&r=");
+            q.push_str(&BASE64URL_NOPAD.encode(r.to_string().as_bytes()));
         }
         if !addrs.is_empty() {
-            uri.push_str("&a=");
-            uri.push_str(&BASE64URL_NOPAD.encode(addrs.join(",").as_bytes()));
+            q.push_str("&a=");
+            q.push_str(&BASE64URL_NOPAD.encode(addrs.join(",").as_bytes()));
         }
-        uri
+        if self.remote {
+            q.push_str("&l=1");
+        }
+        if self.expires > 0 {
+            q.push_str(&format!("&e={}", self.expires));
+        }
+        q
     }
 
-    pub fn parse(uri: &str) -> Result<Self> {
-        let uri = uri.trim();
-        let query = uri.strip_prefix(SCHEME).context("not an Ogneliss Share link")?;
+    /// Найти ссылку в тексте: QR-код, ссылка или сообщение целиком
+    /// («Подключитесь ко мне: https://ogneliss.ru/share/join/#…»).
+    pub fn parse(text: &str) -> Result<Self> {
+        let query = MARKERS
+            .iter()
+            .filter_map(|m| text.find(m).map(|i| &text[i + m.len()..]))
+            .next()
+            .context("not an Ogneliss Share link")?;
+        // Параметры — до первого пробела или знака, которого в них не бывает.
+        let end = query
+            .find(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | '<' | '>' | ')' | ']' | '»'))
+            .unwrap_or(query.len());
+        let query = &query[..end];
         let mut mode = None;
         let mut id = None;
         let mut token = None;
@@ -109,6 +158,8 @@ impl PairLink {
         let mut platform = String::from("other");
         let mut relay = None;
         let mut addrs = Vec::new();
+        let mut remote = false;
+        let mut expires = 0;
         for pair in query.split('&') {
             let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
             match k {
@@ -136,6 +187,8 @@ impl PairLink {
                     addrs =
                         s.split(',').filter_map(|a| a.trim().parse::<SocketAddr>().ok()).take(16).collect();
                 }
+                "l" => remote = v == "1",
+                "e" => expires = v.parse().unwrap_or(0),
                 _ => {}
             }
         }
@@ -147,6 +200,8 @@ impl PairLink {
             platform,
             relay,
             addrs,
+            remote,
+            expires,
         })
     }
 }
@@ -189,6 +244,8 @@ mod tests {
             platform: "windows".into(),
             relay: "https://relay.example.org./".parse().ok(),
             addrs: vec!["192.168.1.5:41000".parse().unwrap(), "[fe80::1]:41000".parse().unwrap()],
+            remote: false,
+            expires: 0,
         };
         let uri = link.to_uri();
         assert!(uri.starts_with(SCHEME));
@@ -200,11 +257,40 @@ mod tests {
         assert_eq!(back.platform, "windows");
         assert_eq!(back.addrs, link.addrs);
         assert_eq!(back.relay, link.relay);
+        assert!(!back.remote);
+    }
+
+    #[test]
+    fn message_links_are_found_in_text() {
+        let link = PairLink {
+            mode: PairMode::Files,
+            id: SecretKey::generate().public(),
+            token: rand::random(),
+            name: "Телефон".into(),
+            platform: "android".into(),
+            relay: None,
+            addrs: vec![],
+            remote: true,
+            expires: 1_900_000_000,
+        };
+        let web = link.to_web_uri();
+        assert!(web.starts_with(WEB_PREFIX));
+        let message = format!("Файлы для тебя: {web}\nСсылка действует сутки.");
+        for text in [web.clone(), message, format!("«{web}»"), web.replace("https://", "")] {
+            let back = PairLink::parse(&text).unwrap();
+            assert_eq!(back.mode, PairMode::Files);
+            assert_eq!(back.id, link.id);
+            assert_eq!(back.token, link.token);
+            assert!(back.remote);
+            assert_eq!(back.expires, 1_900_000_000);
+        }
     }
 
     #[test]
     fn foreign_links_are_rejected() {
         assert!(PairLink::parse("https://example.com").is_err());
+        assert!(PairLink::parse("https://example.com/share/#v=1&m=p").is_err());
+        assert!(PairLink::parse("https://ogneliss.ru/share/").is_err());
         assert!(PairLink::parse("ogshare://pair?v=2&m=p").is_err());
         assert!(PairLink::parse("ogshare://pair?v=1&m=p&id=zzz&t=aa").is_err());
     }

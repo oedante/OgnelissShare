@@ -4,8 +4,12 @@
 #  · Dart: каталоги платформ (tool/bootstrap.py → flutter create + накладка),
 #    flutter analyze, flutter test.
 #  · Сборки: Android (APK по архитектурам), Linux, Windows, macOS, iOS (без
-#    подписи). Результаты — в «Artifacts» запуска (14 дней), по метке v* —
-#    ещё и в выпуске (Releases).
+#    подписи). Результаты — в «Artifacts» запуска (14 дней) и в Releases:
+#      – новая версия в pubspec.yaml (метки v<версия> ещё нет) или метка v* —
+#        выпуск «Ogneliss Share <версия>»;
+#      – остальные изменения main — предварительный выпуск «Тестовая сборка»
+#        (метка nightly, файлы заменяются). Имена файлов постоянные, поэтому
+#        ссылки …/releases/latest/download/<файл> всегда ведут на последнюю версию.
 #  · Сводка: итоги задач и хвосты журналов кладутся в ветку ci-status
 #    (только этот каталог, без кода) — чтобы разбирать ошибки сборки без
 #    доступа к интерфейсу Actions. Ветку можно удалить в любой момент.
@@ -139,7 +143,11 @@ jobs:
             echo "::notice title=Отладочная подпись::Секретов ключа нет — APK подписан отладочным ключом (для проверки, не для магазинов)"
           fi
       - name: Сборка APK
-        run: flutter build apk --release --split-per-abi 2>&1 | tee -a ci-logs/android.log
+        run: |
+          flutter build apk --release --split-per-abi 2>&1 | tee -a ci-logs/android.log
+          # Из чего состоит APK — чтобы следить за размером.
+          unzip -lv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            | sort -k1 -n | tail -n 12 | tee -a ci-logs/android.log
       - name: Убрать ключ
         if: ${{ always() }}
         run: rm -f android/key.properties "$RUNNER_TEMP/upload-keystore.jks"
@@ -316,10 +324,26 @@ jobs:
 
   release:
     name: Выпуск
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') }}
     needs: [core, dart, android, linux, windows, macos, ios]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+      - name: Что выпускаем
+        id: what
+        run: |
+          version=$(sed -n 's/^version: *\([0-9][0-9.]*\).*/\1/p' pubspec.yaml)
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"; kind=version
+          elif git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            tag=nightly; kind=nightly
+          else
+            tag="v$version"; kind=version
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "Выпуск: $tag ($kind)"
       - uses: actions/download-artifact@v4
         with:
           pattern: ogneliss-share-*
@@ -327,16 +351,49 @@ jobs:
       - name: Файлы выпуска
         run: |
           mkdir -p out
-          cp dist/ogneliss-share-android/*.apk out/
-          cp dist/ogneliss-share-linux/*.tar.gz out/
-          cp dist/ogneliss-share-macos/*.zip out/
-          cp dist/ogneliss-share-ios-unsigned/*.ipa out/
+          apk=dist/ogneliss-share-android
+          cp "$apk/app-arm64-v8a-release.apk" out/ogneliss-share-android-arm64.apk
+          cp "$apk/app-armeabi-v7a-release.apk" out/ogneliss-share-android-armv7.apk
+          cp "$apk/app-x86_64-release.apk" out/ogneliss-share-android-x86_64.apk
+          cp dist/ogneliss-share-linux/ogneliss-share-linux-x64.tar.gz out/
+          cp dist/ogneliss-share-macos/ogneliss-share-macos.zip out/
+          cp dist/ogneliss-share-ios-unsigned/ogneliss-share-ios-unsigned.ipa out/
           (cd dist/ogneliss-share-windows && zip -qry ../../out/ogneliss-share-windows-x64.zip .)
+          (cd out && sha256sum * > SHA256SUMS.txt)
           ls -la out
+      - name: Описание тестовой сборки
+        if: ${{ steps.what.outputs.kind == 'nightly' }}
+        run: |
+          {
+            echo "Сборка с ветки main: ${GITHUB_SHA::7} от $(date -u '+%d.%m.%Y %H:%M') UTC."
+            echo
+            echo "Для проверки: может быть нестабильной. Android — ogneliss-share-android-arm64.apk"
+            echo "(старые 32-битные телефоны — armv7), Windows — ogneliss-share-windows-x64.zip"
+            echo "(распакуйте и запустите ogneliss_share.exe). macOS и iOS — без подписи."
+            echo
+            echo "A test build from main: may be unstable. macOS and iOS builds are unsigned."
+          } > notes.md
+          # Метка nightly — на этот коммит (выпуск обновляется на месте).
+          git tag -f nightly "$GITHUB_SHA"
+          git push -f origin refs/tags/nightly
       - uses: softprops/action-gh-release@v2
+        if: ${{ steps.what.outputs.kind == 'nightly' }}
         with:
+          tag_name: nightly
+          name: Тестовая сборка · test build
+          body_path: notes.md
+          prerelease: true
+          make_latest: false
           files: out/*
+      - uses: softprops/action-gh-release@v2
+        if: ${{ steps.what.outputs.kind == 'version' }}
+        with:
+          tag_name: ${{ steps.what.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Ogneliss Share ${{ steps.what.outputs.version }}
+          make_latest: true
           generate_release_notes: true
+          files: out/*
 
   report:
     name: Сводка (ветка ci-status)

@@ -62,6 +62,13 @@ fn peer_arg(v: &Value) -> Result<EndpointId> {
     EndpointId::from_str(str_arg(v, "peer")?).map_err(|_| anyhow!("not_found"))
 }
 
+fn paths_arg(v: &Value) -> Vec<PathBuf> {
+    v.get("paths")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(Value::as_str).map(PathBuf::from).collect())
+        .unwrap_or_default()
+}
+
 fn ok() -> Result<Value> {
     Ok(Value::Null)
 }
@@ -96,8 +103,24 @@ fn dispatch(v: &Value) -> Result<Value> {
             ok()
         }
         "create_invite" => {
-            let mode = PairMode::parse(str_arg(v, "mode")?).ok_or_else(|| anyhow!("bad_request"))?;
+            let mode = match PairMode::parse(str_arg(v, "mode")?) {
+                Some(m @ (PairMode::Pair | PairMode::Once)) => m,
+                _ => bail!("bad_request"),
+            };
             Ok(node.create_invite(mode))
+        }
+        "create_link" => {
+            let mode = PairMode::parse(str_arg(v, "mode")?).ok_or_else(|| anyhow!("bad_request"))?;
+            let take = v.get("take_files").and_then(Value::as_bool).unwrap_or(false);
+            node.create_link(mode, paths_arg(v), take)
+        }
+        "revoke_link" => {
+            node.revoke_link(str_arg(v, "id")?)?;
+            ok()
+        }
+        "rename_peer" => {
+            node.rename_peer(&peer_arg(v)?, str_arg(v, "name")?)?;
+            ok()
         }
         "cancel_invite" => {
             node.cancel_invite();
@@ -113,14 +136,7 @@ fn dispatch(v: &Value) -> Result<Value> {
             node.remove_peer(&peer_arg(v)?)?;
             ok()
         }
-        "send_files" => {
-            let paths: Vec<PathBuf> = v
-                .get("paths")
-                .and_then(Value::as_array)
-                .map(|a| a.iter().filter_map(Value::as_str).map(PathBuf::from).collect())
-                .unwrap_or_default();
-            Ok(json!(node.send_files(peer_arg(v)?, paths)?))
-        }
+        "send_files" => Ok(json!(node.send_files(peer_arg(v)?, paths_arg(v))?)),
         "send_text" => Ok(json!(node.send_text(peer_arg(v)?, str_arg(v, "text")?.to_string())?)),
         "respond_offer" => {
             let accept = v.get("accept").and_then(Value::as_bool).unwrap_or(false);
