@@ -1,0 +1,30 @@
+# Сборка ядра на Rust (../rust) для всех платформ через Cargokit.
+# Плагин без кода на Dart: привязки к функциям ядра — в lib/core/native.dart
+# приложения. Каталоги android/ ios/ macos/ linux/ windows/ только вызывают
+# Cargokit, который собирает библиотеку cargo нужной цели и кладёт её в сборку.
+name: ogneliss_core
+description: "Ядро Ogneliss Share на Rust: сборка библиотеки для Android, iOS, macOS, Windows и Linux"
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        ffiPlugin: true
+      ios:
+        ffiPlugin: true
+      linux:
+        ffiPlugin: true
+      macos:
+        ffiPlugin: true
+      windows:
+        ffiPlugin: true

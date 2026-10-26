@@ -1,0 +1,64 @@
+[package]
+name = "ogneliss_core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.91"
+license = "Apache-2.0"
+description = "Ядро Ogneliss Share: прямые зашифрованные передачи файлов между устройствами"
+repository = "https://github.com/oedante/OgnelissShare"
+publish = false
+
+[lib]
+name = "ogneliss_core"
+# cdylib — Android, Windows, Linux; staticlib — iOS и macOS (через CocoaPods);
+# rlib — тесты на машине разработчика.
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+# Соединения QUIC по открытому ключу устройства: пробивка NAT, запасной
+# ретранслятор, шифрование TLS 1.3 со взаимной проверкой ключей.
+iroh = { version = "1.4", default-features = false, features = ["tls-ring", "portmapper"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "fs", "io-util"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Хеш каждого файла: целостность и проверка после докачки.
+blake3 = "1"
+rand = "0.10"
+data-encoding = "2"
+anyhow = "1"
+# Отмена передач.
+tokio-util = "0.7"
+
+# Поиск устройств в локальной сети без интернета. На iOS не подключаем:
+# сырой multicast там требует отдельного разрешения Apple
+# (com.apple.developer.networking.multicast).
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+iroh-mdns-address-lookup = "0.6"
+
+# Android: передать ядру JavaVM для чтения DNS текущей сети.
+[target.'cfg(target_os = "android")'.dependencies]
+jni-sys = "0.3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "fs", "io-util", "test-util"] }
+
+[profile.release]
+# Размер важен для мобильных: оптимизация по размеру, полная LTO, без
+# локальных символов. Экспорт osh_* сохраняется (динамическая таблица),
+# а статическая библиотека для iOS и macOS strip не затрагивает.
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+
+# Горячие места передачи — с полной оптимизацией по скорости.
+[profile.release.package.blake3]
+opt-level = 3
+[profile.release.package.noq-proto]
+opt-level = 3
+[profile.release.package.noq-udp]
+opt-level = 3
+[profile.release.package.noq]
+opt-level = 3
+[profile.release.package.rustls]
+opt-level = 3

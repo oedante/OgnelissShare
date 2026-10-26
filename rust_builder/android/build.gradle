@@ -1,0 +1,51 @@
+// Сборка ядра на Rust для Android: Cargokit вызывает cargo для каждой ABI
+// и кладёт libogneliss_core.so в jniLibs этого модуля.
+
+group 'com.ogneliss.share.core'
+version '1.0'
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.3.0'
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.ogneliss.share.core'
+    }
+
+    compileSdkVersion 36
+
+    // Та же версия NDK, что у приложения (flutter.ndkVersion).
+    ndkVersion android.ndkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    defaultConfig {
+        minSdkVersion 24
+    }
+}
+
+apply from: "../cargokit/gradle/plugin.gradle"
+cargokit {
+    manifestDir = "../../rust"
+    libname = "ogneliss_core"
+}

@@ -1,0 +1,12 @@
+Ogneliss Share
+Copyright 2026 Ermishin Oleg (Ермишин Олег Андреевич)
+https://github.com/oedante/OgnelissShare
+
+С использованием открытого проекта Ogneliss Share от Ермишина Олега Андреевича.
+Uses the open source project Ogneliss Share by Oleg Ermishin.
+
+В составе (third-party components):
+- iroh, noq — авторы: n0 team и др. — MIT OR Apache-2.0 (https://github.com/n0-computer/iroh);
+  часть кода iroh основана на tailscale — BSD-3-Clause, Copyright (c) 2020 Tailscale Inc & AUTHORS
+- Cargokit (rust_builder/cargokit) — Copyright 2022 Matej Knopp — MIT
+- Flutter и пакеты pub.dev — их лицензии показывает экран «Лицензии» в приложении

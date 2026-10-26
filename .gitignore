@@ -1,0 +1,28 @@
+# Сборка и служебные файлы Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+.idea/
+.vscode/
+.DS_Store
+*.log
+coverage/
+
+# Rust
+rust/target/
+
+# Каталоги платформ создаёт tool/bootstrap.py (flutter create + накладка
+# tool/platform). Их служебные части — в .gitignore каждого каталога,
+# здесь — то, что не должно попасть в git ни при каких условиях:
+android/key.properties
+android/local.properties
+*.jks
+*.keystore
+**/Pods/
+**/.symlinks/
+**/ephemeral/
+**/Flutter/Generated.xcconfig
+**/Flutter/flutter_export_environment.sh
