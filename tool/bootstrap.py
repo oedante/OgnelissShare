@@ -7,7 +7,8 @@
      MainActivity с «Поделиться» и инициализацией ядра, строки Android;
   2) правит настройки: идентификаторы com.ogneliss.share, названия
      «Ogneliss Share», разрешения камеры и локальной сети, права песочницы
-     macOS, подпись Android-сборки ключом из android/key.properties;
+     macOS, манифест приватности iOS и macOS (PrivacyInfo.xcprivacy),
+     подпись Android-сборки ключом из android/key.properties;
   3) переводит системные тексты: запросы разрешений iOS и macOS берутся из
      lib/l10n/app_*.arb (InfoPlist.strings для en и ru), меню macOS — из
      tool/l10n/macos_menu.json;
@@ -203,6 +204,63 @@ def strings_file(entries):
     return '\n'.join(lines) + '\n'
 
 
+def pbx_add_resource(pbxproj, name, file_type):
+    """Обычный ресурс Runner/<name> — в группу Runner и в ресурсы приложения."""
+    text = read(pbxproj)
+    ref = pbx_id(f'{name}/ref')
+    if ref in text:
+        return
+    build = pbx_id(f'{name}/build')
+    text = pbx_add_to_section(
+        text, 'PBXBuildFile',
+        f'\t\t{build} /* {name} in Resources */ = {{isa = PBXBuildFile; fileRef = {ref} /* {name} */; }};\n',
+        pbxproj)
+    text = pbx_add_to_section(
+        text, 'PBXFileReference',
+        f'\t\t{ref} /* {name} */ = {{isa = PBXFileReference; lastKnownFileType = {file_type}; '
+        f'path = {name}; sourceTree = "<group>"; }};\n',
+        pbxproj)
+    runner = pbx_find(text, 'Runner', 'PBXGroup', pbxproj)
+    text = pbx_add_to_list(text, runner, 'children', f'{ref} /* {name} */', pbxproj)
+    phase = pbx_resources_phase(text, pbxproj)
+    text = pbx_add_to_list(text, phase, 'files', f'{build} /* {name} in Resources */', pbxproj)
+    write(pbxproj, text)
+
+
+# Манифест приватности (App Store требует его с 2024 года). Сбора данных и
+# слежения нет; объявлены «API с обоснованием», которые вызывает ядро:
+#   · время и размер файлов (stat) — свои файлы приложения (C617.1) и файлы,
+#     которые выбрал человек (3B52.1);
+#   · свободное место на диске перед приёмом (E174.1);
+#   · время с загрузки системы — таймеры и измерение интервалов (35F9.1).
+PRIVACY_MANIFEST = {
+    'NSPrivacyTracking': False,
+    'NSPrivacyTrackingDomains': [],
+    'NSPrivacyCollectedDataTypes': [],
+    'NSPrivacyAccessedAPITypes': [
+        {'NSPrivacyAccessedAPIType': 'NSPrivacyAccessedAPICategoryFileTimestamp',
+         'NSPrivacyAccessedAPITypeReasons': ['C617.1', '3B52.1']},
+        {'NSPrivacyAccessedAPIType': 'NSPrivacyAccessedAPICategoryDiskSpace',
+         'NSPrivacyAccessedAPITypeReasons': ['E174.1']},
+        {'NSPrivacyAccessedAPIType': 'NSPrivacyAccessedAPICategorySystemBootTime',
+         'NSPrivacyAccessedAPITypeReasons': ['35F9.1']},
+    ],
+}
+
+
+def add_privacy_manifest(runner, pbxproj):
+    with open(runner / 'PrivacyInfo.xcprivacy', 'wb') as f:
+        plistlib.dump(PRIVACY_MANIFEST, f)
+    pbx_add_resource(pbxproj, 'PrivacyInfo.xcprivacy', 'text.xml')
+
+
+# Шифрование: стандартные алгоритмы (TLS 1.3, QUIC) из своей библиотеки, а не
+# из iOS. По правилам App Store документы для этого нужны только при выпуске
+# в App Store Франции (декларация ANSSI), поэтому NO — пока Франции нет в
+# списке стран. Подробно — docs/RELEASE.md, «Экспортные правила».
+ENCRYPTION_KEYS = {'ITSAppUsesNonExemptEncryption': False}
+
+
 def localize_info_plist(runner, pbxproj, keys):
     """Запросы разрешений на языке системы: <язык>.lproj/InfoPlist.strings."""
     for lang in LANGS:
@@ -385,11 +443,11 @@ def patch_ios():
         # Полученные файлы видны в «Файлах» → «На iPhone» → Ogneliss Share.
         'UIFileSharingEnabled': True,
         'LSSupportsOpeningDocumentsInPlace': True,
-        # Шифрование — только стандартное (TLS 1.3/QUIC): экспортное освобождение.
-        'ITSAppUsesNonExemptEncryption': False,
+        **ENCRYPTION_KEYS,
     })
     patch_bundle_ids(pbxproj)
     localize_info_plist(runner, pbxproj, PERMISSION_TEXTS)
+    add_privacy_manifest(runner, pbxproj)
 
     delegate = runner / 'AppDelegate.swift'
     text = read(delegate)
@@ -397,7 +455,7 @@ def patch_ios():
         text = must_sub(text, r'(\n)(    return super\.application\(application, didFinishLaunchingWithOptions)',
                         lambda m: m.group(1) + IOS_NO_BACKUP + m.group(2), delegate, count=1)
         write(delegate, text)
-    log('ios: Info.plist, переводы, идентификатор, без резервных копий ключа')
+    log('ios: Info.plist, переводы, идентификатор, манифест приватности, без резервных копий ключа')
 
 
 def patch_macos():
@@ -408,6 +466,7 @@ def patch_macos():
         'CFBundleLocalizations': LANGS,
         **{key: en[arb_key] for key, arb_key in PERMISSION_TEXTS.items()},
         'LSApplicationCategoryType': 'public.app-category.utilities',
+        **ENCRYPTION_KEYS,
     })
     entitlements = {
         'com.apple.security.app-sandbox': True,
@@ -429,7 +488,8 @@ def patch_macos():
     patch_bundle_ids(pbxproj)
     localize_info_plist(runner, pbxproj, PERMISSION_TEXTS)
     localize_mac_menu(runner, pbxproj)
-    log('macos: права песочницы, камера, название, переводы меню и запросов')
+    add_privacy_manifest(runner, pbxproj)
+    log('macos: права песочницы, камера, название, переводы меню и запросов, манифест приватности')
 
 
 def patch_windows():

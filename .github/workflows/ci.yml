@@ -3,8 +3,9 @@
 #  · Ядро (Rust): тесты на двух-трёх узлах в одном процессе и clippy.
 #  · Dart: каталоги платформ (tool/bootstrap.py → flutter create + накладка),
 #    flutter analyze, flutter test.
-#  · Сборки: Android (APK по архитектурам), Linux, Windows, macOS, iOS (без
-#    подписи). Результаты — в «Artifacts» запуска (14 дней) и в Releases:
+#  · Сборки: Android (APK по архитектурам и AAB для Google Play), Linux,
+#    Windows (и пакет MSIX для Microsoft Store), macOS, iOS (без подписи).
+#    Результаты — в «Artifacts» запуска (14 дней) и в Releases:
 #      – новая версия в pubspec.yaml (метки v<версия> ещё нет) или метка v* —
 #        выпуск «Ogneliss Share <версия>»;
 #      – остальные изменения main — предварительный выпуск «Тестовая сборка»
@@ -93,6 +94,9 @@ jobs:
       - name: Тесты
         if: ${{ !cancelled() }}
         run: flutter test 2>&1 | tee ci-logs/test.log
+      - name: Тексты магазинов
+        if: ${{ !cancelled() }}
+        run: python tool/release/check_store.py 2>&1 | tee ci-logs/store.log
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
@@ -142,12 +146,22 @@ jobs:
           else
             echo "::notice title=Отладочная подпись::Секретов ключа нет — APK подписан отладочным ключом (для проверки, не для магазинов)"
           fi
-      - name: Сборка APK
+      - name: Сборка APK и AAB
         run: |
           flutter build apk --release --split-per-abi 2>&1 | tee -a ci-logs/android.log
+          flutter build appbundle --release 2>&1 | tee -a ci-logs/android.log
           # Из чего состоит APK — чтобы следить за размером.
           unzip -lv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
             | sort -k1 -n | tail -n 12 | tee -a ci-logs/android.log
+      - name: Требования Google Play
+        run: |
+          # Страницы памяти 16 КБ у 64-битных библиотек (обязательно с ноября 2025).
+          python tool/release/check_apk.py build/app/outputs/flutter-apk/*-release.apk \
+            build/app/outputs/bundle/release/app-release.aab 2>&1 | tee -a ci-logs/android.log
+          # Целевой API (с 31.08.2026 Google Play принимает только 36 и выше).
+          aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)aapt2
+          "$aapt2" dump badging build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            | grep -E "^(package|sdkVersion|targetSdkVersion)" | tee -a ci-logs/android.log
       - name: Убрать ключ
         if: ${{ always() }}
         run: rm -f android/key.properties "$RUNNER_TEMP/upload-keystore.jks"
@@ -155,6 +169,12 @@ jobs:
         with:
           name: ogneliss-share-android
           path: build/app/outputs/flutter-apk/*-release.apk
+          retention-days: 14
+      # Для Google Play (подписан ключом из секретов, если он задан).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: store-android-aab
+          path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 14
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
@@ -221,12 +241,19 @@ jobs:
         run: |
           mkdir -p ci-logs
           python tool/bootstrap.py 2>&1 | tee ci-logs/windows.log
-      - name: Сборка
-        run: flutter build windows --release 2>&1 | tee -a ci-logs/windows.log
+      - name: Сборка и пакет MSIX
+        # Тот же flutter build windows, плюс пакет для Microsoft Store (проверяет
+        # манифест и значки; подписывает пакет сам Store при публикации).
+        run: python tool/release/build.py windows --msix 2>&1 | tee -a ci-logs/windows.log
       - uses: actions/upload-artifact@v4
         with:
           name: ogneliss-share-windows
           path: build/windows/x64/runner/Release/
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: store-windows-msix
+          path: dist/*.msix
           retention-days: 14
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}

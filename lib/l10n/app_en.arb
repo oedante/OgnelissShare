@@ -326,7 +326,7 @@
   "@endSession": {
     "description": "Пункт меню"
   },
-  "forgetConfirm": "“{name}” and this device will no longer be able to exchange files. You will need a QR code to link them again.",
+  "forgetConfirm": "“{name}” and this device will no longer be able to exchange files. To link them again, you will need a QR code or an invitation link.",
   "@forgetConfirm": {
     "description": "Подтверждение",
     "placeholders": {
@@ -750,7 +750,7 @@
   "@howItWorks": {
     "description": "Раздел"
   },
-  "howItWorksBody": "There are no accounts. Every device has its own key created on the device itself; devices recognize each other by these keys.\n\nDevices can only be linked with a QR code shown on screen: a stranger can neither connect nor send a file — such connections are rejected right away.\n\nFiles go directly between devices, encrypted (QUIC, TLS 1.3). If a direct path is impossible, data goes through a relay, which only sees the encrypted stream.\n\nAfter a connection drop the transfer resumes where it stopped, and every file is verified with a BLAKE3 hash.",
+  "howItWorksBody": "There are no accounts. Every device has its own key created on the device itself; devices recognize each other by these keys.\n\nDevices can only be linked with a QR code shown on screen or with an invitation link you sent yourself: a link works once, and the inviting device confirms the connection. A stranger can neither connect nor send a file — such connections are rejected right away.\n\nFiles go directly between devices, encrypted (QUIC, TLS 1.3). If a direct path is impossible, data goes through a relay, which only sees the encrypted stream.\n\nAfter a connection drop the transfer resumes where it stopped, and every file is verified with a BLAKE3 hash.",
   "@howItWorksBody": {
     "description": "Пояснение"
   },

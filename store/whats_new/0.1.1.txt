@@ -1,0 +1,14 @@
+<ru-RU>
+Первая версия для тестирования:
+• файлы, папки, фото, видео и текст — между своими устройствами напрямую
+• связывание QR-кодом или ссылкой по почте и в мессенджерах
+• разовый обмен с другими людьми и файлы по ссылке
+• сквозное шифрование; после обрыва связи передача продолжается
+</ru-RU>
+<en-US>
+First test version:
+• files, folders, photos, videos and text — directly between your devices
+• link devices with a QR code or a link sent by e-mail or in a messenger
+• one-time exchange with other people and files by link
+• end-to-end encryption; transfers resume after a dropped connection
+</en-US>

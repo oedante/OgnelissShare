@@ -106,10 +106,44 @@ def linux():
     save(rounded, OUT / 'linux' / 'runner' / 'resources' / 'app_icon.png', 256)
 
 
+def msix():
+    """Значки пакета MSIX (Microsoft Store): tool/release/msix/Assets.
+
+    Имена с уточнениями (.scale-200, .targetsize-32…) Windows выбирает по
+    resources.pri — его делает tool/release/build.py (makepri); файлы без
+    уточнений — запасные, на случай пакета без resources.pri.
+    altform-unplated — значок без цветной подложки (панель задач, «Пуск»):
+    у нас своя скруглённая плитка, подложка не нужна.
+    """
+    d = ROOT / 'tool' / 'release' / 'msix' / 'Assets'
+    if d.exists():
+        shutil.rmtree(d)
+    d.mkdir(parents=True)
+    rounded = Image.open(ICONS / 'app_icon_rounded.png').convert('RGBA')
+
+    def padded(px, frac):
+        """Значок с полями (плитка «Пуск» 150×150: знак не во всю плитку)."""
+        canvas = Image.new('RGBA', (px, px), (0, 0, 0, 0))
+        inner = rounded.resize((round(px * frac), round(px * frac)), Image.LANCZOS)
+        canvas.alpha_composite(inner, ((px - inner.width) // 2, (px - inner.height) // 2))
+        return canvas
+
+    scales = (100, 125, 150, 200, 400)
+    for name, base, frac in (('Square44x44Logo', 44, 1.0), ('Square150x150Logo', 150, 0.66), ('StoreLogo', 50, 1.0)):
+        padded(base, frac).save(d / f'{name}.png', optimize=True)
+        for s in scales:
+            padded(round(base * s / 100), frac).save(d / f'{name}.scale-{s}.png', optimize=True)
+    for t in (16, 24, 32, 48, 256):
+        img = rounded.resize((t, t), Image.LANCZOS)
+        img.save(d / f'Square44x44Logo.targetsize-{t}.png', optimize=True)
+        img.save(d / f'Square44x44Logo.targetsize-{t}_altform-unplated.png', optimize=True)
+
+
 if __name__ == '__main__':
     android()
     ios()
     macos()
     windows()
     linux()
+    msix()
     print('ok')
