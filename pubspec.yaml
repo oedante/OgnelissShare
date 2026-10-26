@@ -13,6 +13,8 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # Даты и числа по правилам языка; версию задаёт flutter_localizations.
+  intl: any
   # Ядро на Rust (rust/), собирается Cargokit для каждой платформы.
   ogneliss_core:
     path: rust_builder
@@ -35,6 +37,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Классы локализации из lib/l10n/*.arb (см. l10n.yaml).
+  generate: true
   assets:
     - assets/brand/mark.png
     - assets/licenses/rust.json

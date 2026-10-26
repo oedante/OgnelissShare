@@ -8,10 +8,10 @@ import 'package:flutter/services.dart';
 
 import '../app/app_model.dart';
 import '../app/format.dart';
-import '../app/strings.dart';
 import '../core/models.dart';
 import '../platform/files.dart';
 import '../platform/platform_bridge.dart';
+import '../l10n/l10n.dart';
 import 'send_sheet.dart';
 import 'widgets.dart';
 
@@ -112,7 +112,7 @@ class _ShellState extends State<Shell> {
       case 'received':
         final saved = e.maybe('saved_to');
         final failed = e.number('failed');
-        var text = tr.receivedFiles(e.name, e.number('count') - failed);
+        var text = tr.receivedFiles(tr.deviceName(e.name), e.number('count') - failed);
         if (failed > 0) text = '$text · ${tr.failedFiles(failed)}';
         showSnack(
           text,
@@ -123,18 +123,19 @@ class _ShellState extends State<Shell> {
       case 'text':
         _showText(e);
       case 'peer_removed':
-        showSnack(tr.peerRemoved(e.name));
+        showSnack(tr.peerRemoved(tr.deviceName(e.name)));
     }
   }
 
   Future<void> _showText(CoreEvent e) async {
-    final ctx = navigatorKey.currentContext;
     final model = _model;
-    if (ctx == null || model == null) return;
-    final text = model.fullText(e.str('transfer')) ?? e.str('text');
+    if (model == null) return;
+    final text = await model.fullText(e.str('transfer')) ?? e.str('text');
+    final dialogContext = navigatorKey.currentContext;
+    if (dialogContext == null || !dialogContext.mounted || !mounted) return;
     await showDialog<void>(
-      context: ctx,
-      builder: (_) => TextDialog(title: tr.receivedText(e.name), text: text),
+      context: dialogContext,
+      builder: (_) => TextDialog(title: tr.receivedText(tr.deviceName(e.name)), text: text),
     );
   }
 
@@ -148,7 +149,7 @@ class _ShellState extends State<Shell> {
     final payload = await PlatformBridge.takeShared();
     if (payload == null || !mounted) return;
     final ctx = navigatorKey.currentContext;
-    if (ctx == null) return;
+    if (ctx == null || !ctx.mounted) return;
     await showShareTargetSheet(ctx, payload);
   }
 }
@@ -199,7 +200,7 @@ class _RequestDialogState extends State<RequestDialog> {
     if (r.kind == 'pair') {
       return AlertDialog(
         icon: PeerAvatar(platform: r.platform),
-        title: Text(tr.pairRequestTitle(r.name), textAlign: TextAlign.center),
+        title: Text(tr.pairRequestTitle(tr.deviceName(r.name)), textAlign: TextAlign.center),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -223,7 +224,7 @@ class _RequestDialogState extends State<RequestDialog> {
     }
     return AlertDialog(
       icon: PeerAvatar(platform: widget.model.snapshot.peer(r.peer)?.platform ?? ''),
-      title: Text(tr.offerTitle(r.name), textAlign: TextAlign.center),
+      title: Text(tr.offerTitle(tr.deviceName(r.name)), textAlign: TextAlign.center),
       content: Text(
         '${formatNames(r.names, r.count)}\n${formatBytes(r.total)}',
         textAlign: TextAlign.center,

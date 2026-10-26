@@ -28,6 +28,7 @@ data-encoding = "2"
 anyhow = "1"
 # Отмена передач.
 tokio-util = "0.7"
+fs4 = "1"
 
 # Поиск устройств в локальной сети без интернета. На iOS не подключаем:
 # сырой multicast там требует отдельного разрешения Apple
@@ -38,6 +39,12 @@ iroh-mdns-address-lookup = "0.6"
 # Android: передать ядру JavaVM для чтения DNS текущей сети.
 [target.'cfg(target_os = "android")'.dependencies]
 jni-sys = "0.3"
+
+# iOS: netdev 0.46 (его тянет iroh 1.4) не собирается с libc ≥ 0.2.190 —
+# там тип in6_ifreq оставили только для macOS. Исправлено в netdev 0.47;
+# когда iroh перейдёт на неё, ограничение убрать.
+[target.'cfg(target_os = "ios")'.dependencies]
+libc = ">=0.2.180, <0.2.190"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "fs", "io-util", "test-util"] }

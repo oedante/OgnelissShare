@@ -6,12 +6,12 @@ import 'package:flutter/services.dart';
 
 import '../app/app_model.dart';
 import '../app/format.dart';
-import '../app/strings.dart';
 import '../core/models.dart';
 import '../core/native.dart';
 import '../platform/files.dart';
 import '../platform/platform_bridge.dart';
 import '../platform/startup.dart';
+import '../l10n/l10n.dart';
 import 'shell.dart';
 import 'widgets.dart';
 
@@ -44,7 +44,7 @@ class _SendSheet extends StatelessWidget {
           children: [
             ListTile(
               leading: PeerAvatar(platform: current.platform, online: current.online),
-              title: Text(tr.sendTo(current.name), style: theme.textTheme.titleMedium),
+              title: Text(tr.sendTo(tr.deviceName(current.name)), style: theme.textTheme.titleMedium),
               subtitle: Row(
                 children: [
                   CodeChip(current.code),
@@ -114,10 +114,10 @@ class _Option extends StatelessWidget {
   }
 }
 
-void _sendPaths(AppModel model, Peer peer, List<String> paths) {
+Future<void> _sendPaths(AppModel model, Peer peer, List<String> paths) async {
   if (paths.isEmpty) return;
   try {
-    model.sendFiles(peer.id, paths);
+    await model.sendFiles(peer.id, paths);
   } on CoreError catch (e) {
     showSnack(tr.error(e.code));
   }
@@ -132,7 +132,7 @@ Future<void> _pickAndSend(BuildContext context, AppModel model, Peer peer, {requ
     showSnack(tr.error('read'));
     return;
   }
-  _sendPaths(model, peer, paths);
+  await _sendPaths(model, peer, paths);
 }
 
 Future<void> _pickFolderAndSend(BuildContext context, AppModel model, Peer peer) async {
@@ -144,7 +144,7 @@ Future<void> _pickFolderAndSend(BuildContext context, AppModel model, Peer peer)
     showSnack(tr.error('read'));
     return;
   }
-  if (folder != null) _sendPaths(model, peer, [folder]);
+  if (folder != null) await _sendPaths(model, peer, [folder]);
 }
 
 Future<void> _composeText(BuildContext context, AppModel model, Peer peer) async {
@@ -154,7 +154,7 @@ Future<void> _composeText(BuildContext context, AppModel model, Peer peer) async
   final text = await showDialog<String>(context: ctx, builder: (_) => _TextComposer(peer: peer));
   if (text == null || text.trim().isEmpty) return;
   try {
-    model.sendText(peer.id, text);
+    await model.sendText(peer.id, text);
   } on CoreError catch (e) {
     showSnack(tr.error(e.code));
   }
@@ -168,7 +168,7 @@ Future<void> _forget(BuildContext context, AppModel model, Peer peer) async {
     context: ctx,
     builder: (dialogContext) => AlertDialog(
       title: Text(peer.isSession ? tr.endSession : tr.forget),
-      content: Text(tr.forgetConfirm(peer.name)),
+      content: Text(tr.forgetConfirm(tr.deviceName(peer.name))),
       actions: [
         TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(tr.cancel)),
         FilledButton(
@@ -184,7 +184,7 @@ Future<void> _forget(BuildContext context, AppModel model, Peer peer) async {
   );
   if (yes != true) return;
   try {
-    model.removePeer(peer.id);
+    await model.removePeer(peer.id);
   } on CoreError catch (e) {
     showSnack(tr.error(e.code));
   }
@@ -219,7 +219,7 @@ class _TextComposerState extends State<_TextComposer> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(tr.sendTo(widget.peer.name)),
+      title: Text(tr.sendTo(tr.deviceName(widget.peer.name))),
       content: SizedBox(
         width: 420,
         child: TextField(
@@ -294,16 +294,17 @@ class _ShareTargets extends StatelessWidget {
                     for (final p in peers)
                       ListTile(
                         leading: PeerAvatar(platform: p.platform, online: p.online),
-                        title: Text(p.name),
+                        title: Text(tr.deviceName(p.name)),
                         subtitle: Text(p.online ? tr.online : tr.offline),
                         trailing: CodeChip(p.code),
-                        onTap: () {
+                        onTap: () async {
                           Navigator.of(context).pop();
+                          final text = payload.text;
                           if (payload.files.isNotEmpty) {
-                            _sendPaths(model, p, payload.files);
-                          } else if (payload.text != null) {
+                            await _sendPaths(model, p, payload.files);
+                          } else if (text != null) {
                             try {
-                              model.sendText(p.id, payload.text!);
+                              await model.sendText(p.id, text);
                             } on CoreError catch (e) {
                               showSnack(tr.error(e.code));
                             }

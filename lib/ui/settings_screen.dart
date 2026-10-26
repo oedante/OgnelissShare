@@ -7,10 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app/app_model.dart';
-import '../app/strings.dart';
 import '../core/native.dart';
 import '../platform/files.dart';
 import '../platform/startup.dart';
+import '../l10n/l10n.dart';
 import 'home_screen.dart';
 import 'shell.dart';
 import 'widgets.dart';
@@ -41,7 +41,7 @@ class SettingsScreen extends StatelessWidget {
                 Card(
                   child: ListTile(
                     leading: PeerAvatar(platform: me.platform, online: me.online),
-                    title: Text(me.name),
+                    title: Text(tr.deviceName(me.name)),
                     subtitle: Text(tr.deviceNameTitle),
                     trailing: const Icon(Icons.edit_outlined),
                     onTap: () => showRenameDialog(context, me.name),
@@ -69,7 +69,7 @@ class SettingsScreen extends StatelessWidget {
                           applicationName: tr.appName,
                           applicationVersion: me.version,
                           applicationIcon: const Padding(padding: EdgeInsets.all(8), child: BrandMark(size: 64)),
-                          applicationLegalese: '© 2026 Ermishin Oleg · Apache License 2.0',
+                          applicationLegalese: tr.legalese,
                         ),
                       ),
                       const Divider(height: 1),
@@ -81,7 +81,8 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       ListTile(
                         leading: const Icon(Icons.public_rounded),
-                        title: const Text('ogneliss.ru'),
+                        title: Text(tr.website),
+                        subtitle: const Text('ogneliss.ru'),
                         onTap: () => launchUrl(Uri.parse(_siteUrl), mode: LaunchMode.externalApplication),
                       ),
                       ListTile(
@@ -120,11 +121,9 @@ class _DownloadsTile extends StatelessWidget {
   final AppModel model;
 
   String _mobileHint() {
-    if (Platform.isIOS) return tr.isRu ? 'Файлы → На iPhone → Ogneliss Share' : 'Files → On My iPhone → Ogneliss Share';
+    if (Platform.isIOS) return tr.whereFilesIos;
     final dir = model.snapshot.me.downloadDir;
-    if (dir.contains('/Download/')) {
-      return tr.isRu ? 'Файлы → Загрузки → Ogneliss Share' : 'Files → Downloads → Ogneliss Share';
-    }
+    if (dir.contains('/Download/')) return tr.whereFilesAndroid;
     return dir;
   }
 
@@ -137,7 +136,7 @@ class _DownloadsTile extends StatelessWidget {
     }
     if (folder == null) return;
     try {
-      model.setDownloadDir(folder);
+      await model.setDownloadDir(folder);
     } on CoreError catch (e) {
       showSnack(tr.error(e.code));
     }
@@ -191,13 +190,30 @@ class _DownloadsTile extends StatelessWidget {
 }
 
 /// Журнал ядра — чтобы приложить к сообщению об ошибке.
-class LogScreen extends StatelessWidget {
+class LogScreen extends StatefulWidget {
   const LogScreen({super.key});
 
   @override
+  State<LogScreen> createState() => _LogScreenState();
+}
+
+class _LogScreenState extends State<LogScreen> {
+  String? _text;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_text == null) _load();
+  }
+
+  Future<void> _load() async {
+    final lines = await AppScope.read(context).logs();
+    if (mounted) setState(() => _text = lines.join('\n'));
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final lines = AppScope.read(context).logs();
-    final text = lines.join('\n');
+    final text = _text ?? '';
     return Scaffold(
       appBar: AppBar(
         title: Text(tr.logs),
@@ -215,7 +231,7 @@ class LogScreen extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: SelectableText(
-          text.isEmpty ? '—' : text,
+          _text == null ? '…' : (text.isEmpty ? '—' : text),
           style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
         ),
       ),

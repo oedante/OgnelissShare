@@ -1,0 +1,798 @@
+{
+  "@@locale": "en",
+  "appName": "Ogneliss Share",
+  "@appName": {
+    "description": "Название приложения (не переводится)"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Кнопка"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Кнопка"
+  },
+  "close": "Close",
+  "@close": {
+    "description": "Кнопка"
+  },
+  "done": "Done",
+  "@done": {
+    "description": "Кнопка"
+  },
+  "retry": "Retry",
+  "@retry": {
+    "description": "Кнопка"
+  },
+  "open": "Open",
+  "@open": {
+    "description": "Кнопка: открыть файл"
+  },
+  "openFolder": "Open folder",
+  "@openFolder": {
+    "description": "Кнопка"
+  },
+  "copy": "Copy",
+  "@copy": {
+    "description": "Кнопка"
+  },
+  "copied": "Copied",
+  "@copied": {
+    "description": "Уведомление"
+  },
+  "accept": "Accept",
+  "@accept": {
+    "description": "Кнопка: принять файлы"
+  },
+  "decline": "Decline",
+  "@decline": {
+    "description": "Кнопка"
+  },
+  "connect": "Connect",
+  "@connect": {
+    "description": "Кнопка"
+  },
+  "clear": "Clear",
+  "@clear": {
+    "description": "Кнопка: очистить список передач"
+  },
+  "settings": "Settings",
+  "@settings": {
+    "description": "Заголовок"
+  },
+  "send": "Send",
+  "@send": {
+    "description": "Кнопка"
+  },
+  "rename": "Rename",
+  "@rename": {
+    "description": "Кнопка"
+  },
+  "paste": "Paste",
+  "@paste": {
+    "description": "Кнопка: вставить из буфера"
+  },
+  "starting": "Starting…",
+  "@starting": {
+    "description": "Пока запускается ядро"
+  },
+  "thisDevice": "This device",
+  "@thisDevice": {
+    "description": "Заголовок карточки своего устройства"
+  },
+  "deviceNameTitle": "Device name",
+  "@deviceNameTitle": {
+    "description": "Заголовок окна переименования"
+  },
+  "deviceNameHint": "Your other devices will see this name",
+  "@deviceNameHint": {
+    "description": "Подсказка"
+  },
+  "unnamedDevice": "Unnamed device",
+  "@unnamedDevice": {
+    "description": "Если устройство не сообщило имя"
+  },
+  "onlineInternet": "online",
+  "@onlineInternet": {
+    "description": "Своё устройство подключено к интернету"
+  },
+  "onlineLocal": "local network only",
+  "@onlineLocal": {
+    "description": "Нет связи с ретранслятором"
+  },
+  "myDevices": "My devices",
+  "@myDevices": {
+    "description": "Раздел"
+  },
+  "oneTimePeers": "One-time exchange",
+  "@oneTimePeers": {
+    "description": "Раздел"
+  },
+  "online": "online",
+  "@online": {
+    "description": "Состояние устройства"
+  },
+  "offline": "offline",
+  "@offline": {
+    "description": "Состояние устройства"
+  },
+  "connecting": "connecting…",
+  "@connecting": {
+    "description": "Состояние устройства"
+  },
+  "lastSeen": "last seen {ago}",
+  "@lastSeen": {
+    "description": "«когда» — «5 мин назад», «вчера»",
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "sessionBadge": "one-time",
+  "@sessionBadge": {
+    "description": "Плашка у разового собеседника"
+  },
+  "emptyTitle": "Link your devices",
+  "@emptyTitle": {
+    "description": "Пустой список"
+  },
+  "emptyBody": "Show a code on one device and scan it with another — just once. After that, files go directly and encrypted — no accounts, no cloud.",
+  "@emptyBody": {
+    "description": "Пустой список"
+  },
+  "showCode": "Show code",
+  "@showCode": {
+    "description": "Кнопка"
+  },
+  "scanCode": "Scan code",
+  "@scanCode": {
+    "description": "Кнопка"
+  },
+  "pasteLink": "Paste link",
+  "@pasteLink": {
+    "description": "Кнопка на компьютере без камеры"
+  },
+  "addDevice": "Add device",
+  "@addDevice": {
+    "description": "Кнопка"
+  },
+  "transfers": "Transfers",
+  "@transfers": {
+    "description": "Раздел"
+  },
+  "statusPreparing": "Preparing…",
+  "@statusPreparing": {
+    "description": "Состояние передачи"
+  },
+  "statusConnecting": "Connecting…",
+  "@statusConnecting": {
+    "description": "Состояние передачи"
+  },
+  "statusWaitingPeer": "Waiting for the device to come online…",
+  "@statusWaitingPeer": {
+    "description": "Состояние передачи"
+  },
+  "statusWaiting": "Waiting for the receiver…",
+  "@statusWaiting": {
+    "description": "Состояние передачи"
+  },
+  "statusAsking": "Waiting for your decision",
+  "@statusAsking": {
+    "description": "Состояние передачи"
+  },
+  "statusRetrying": "Connection lost, reconnecting…",
+  "@statusRetrying": {
+    "description": "Состояние передачи"
+  },
+  "statusSent": "Sent",
+  "@statusSent": {
+    "description": "Состояние передачи"
+  },
+  "statusReceived": "Received",
+  "@statusReceived": {
+    "description": "Состояние передачи"
+  },
+  "statusDeclined": "The receiver declined",
+  "@statusDeclined": {
+    "description": "Состояние передачи"
+  },
+  "statusCancelled": "Cancelled",
+  "@statusCancelled": {
+    "description": "Состояние передачи"
+  },
+  "statusCancelledByReceiver": "Cancelled by the receiver",
+  "@statusCancelledByReceiver": {
+    "description": "Состояние передачи"
+  },
+  "statusCancelledBySender": "Cancelled by the sender",
+  "@statusCancelledBySender": {
+    "description": "Состояние передачи"
+  },
+  "progress": "{done} of {total} · {rate}",
+  "@progress": {
+    "description": "Ход передачи",
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "progressLeft": "{done} of {total} · {rate} · {left} left",
+  "@progressLeft": {
+    "description": "Ход передачи с оценкой",
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      },
+      "left": {
+        "type": "String"
+      }
+    }
+  },
+  "textItem": "Text",
+  "@textItem": {
+    "description": "Передача текста"
+  },
+  "textPreview": "Text: “{text}”",
+  "@textPreview": {
+    "description": "Начало переданного текста",
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "andMore": "{list} and {more} more",
+  "@andMore": {
+    "description": "«a.jpg, b.jpg и ещё 3»",
+    "placeholders": {
+      "list": {
+        "type": "String"
+      },
+      "more": {
+        "type": "int"
+      }
+    }
+  },
+  "files": "{count, plural, =1{1 file} other{{count} files}}",
+  "@files": {
+    "description": "Число файлов",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "failedFiles": "failed verification: {count, plural, =1{1 file} other{{count} files}}",
+  "@failedFiles": {
+    "description": "Файлы с несовпавшим хешем",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sendTo": "Send to “{name}”",
+  "@sendTo": {
+    "description": "Заголовок",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "sendFiles": "Files",
+  "@sendFiles": {
+    "description": "Пункт меню"
+  },
+  "sendMedia": "Photos & videos",
+  "@sendMedia": {
+    "description": "Пункт меню"
+  },
+  "sendFolder": "Folder",
+  "@sendFolder": {
+    "description": "Пункт меню"
+  },
+  "sendText": "Text or link",
+  "@sendText": {
+    "description": "Пункт меню"
+  },
+  "offlineNote": "The device is offline. The transfer will start as soon as it shows up (we wait up to 10 minutes).",
+  "@offlineNote": {
+    "description": "Подсказка"
+  },
+  "textHint": "Text or link",
+  "@textHint": {
+    "description": "Подсказка поля"
+  },
+  "forget": "Forget device",
+  "@forget": {
+    "description": "Пункт меню"
+  },
+  "endSession": "End exchange",
+  "@endSession": {
+    "description": "Пункт меню"
+  },
+  "forgetConfirm": "“{name}” and this device will no longer be able to exchange files. You will need a QR code to link them again.",
+  "@forgetConfirm": {
+    "description": "Подтверждение",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "addTitle": "Add a device",
+  "@addTitle": {
+    "description": "Заголовок"
+  },
+  "modeMine": "My device",
+  "@modeMine": {
+    "description": "Режим"
+  },
+  "modeOnce": "One-time",
+  "@modeOnce": {
+    "description": "Режим"
+  },
+  "modeMineBody": "For your own devices. The link is kept and files are accepted without asking. On the other device open Ogneliss Share and tap “Scan code”.",
+  "@modeMineBody": {
+    "description": "Пояснение режима"
+  },
+  "modeOnceBody": "For exchanging with another person. The link is temporary, and the receiver confirms every transfer.",
+  "@modeOnceBody": {
+    "description": "Пояснение режима"
+  },
+  "validFor": "Code valid for {time}",
+  "@validFor": {
+    "description": "Обратный отсчёт м:сс",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "copyLink": "Copy link",
+  "@copyLink": {
+    "description": "Кнопка"
+  },
+  "linkHint": "No camera? Copy the link and paste it on the other device: “Scan code” → “Paste link”.",
+  "@linkHint": {
+    "description": "Подсказка"
+  },
+  "joinedPending": "“{name}” is connecting — confirm on this device.",
+  "@joinedPending": {
+    "description": "Состояние кода",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinedDone": "“{name}” added to your devices.",
+  "@joinedDone": {
+    "description": "Состояние кода",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinedOnce": "Connected: “{name}”. You can exchange files now.",
+  "@joinedOnce": {
+    "description": "Состояние кода",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinedDeclined": "Connection of “{name}” declined.",
+  "@joinedDeclined": {
+    "description": "Состояние кода",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newCode": "New code",
+  "@newCode": {
+    "description": "Кнопка"
+  },
+  "codeExpired": "Code expired",
+  "@codeExpired": {
+    "description": "Состояние кода"
+  },
+  "pairRequestTitle": "Connect “{name}”?",
+  "@pairRequestTitle": {
+    "description": "Вопрос",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pairRequestBody": "Make sure the other device shows the same code. If it does not match, tap “Decline”.",
+  "@pairRequestBody": {
+    "description": "Вопрос"
+  },
+  "offerTitle": "“{name}” wants to send files",
+  "@offerTitle": {
+    "description": "Вопрос",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "scanTitle": "Scan code",
+  "@scanTitle": {
+    "description": "Заголовок"
+  },
+  "scanHint": "Point the camera at the QR code on the other device",
+  "@scanHint": {
+    "description": "Подсказка"
+  },
+  "linkFieldHint": "A link like ogshare://…",
+  "@linkFieldHint": {
+    "description": "Подсказка поля"
+  },
+  "cameraUnavailable": "The camera is unavailable. Paste the link copied on the other device.",
+  "@cameraUnavailable": {
+    "description": "Ошибка камеры"
+  },
+  "desktopScanHint": "On a computer it is easier to show the code and scan it with a phone. Or paste the link copied on the other device here.",
+  "@desktopScanHint": {
+    "description": "Подсказка"
+  },
+  "joining": "Connecting to “{name}”…",
+  "@joining": {
+    "description": "Состояние",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinCheckCode": "Check that the other device shows the same code and confirm there:",
+  "@joinCheckCode": {
+    "description": "Подсказка"
+  },
+  "joinDone": "Done! “{name}” is now one of your devices.",
+  "@joinDone": {
+    "description": "Итог",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinDoneOnce": "Connected to “{name}”. You can exchange files now.",
+  "@joinDoneOnce": {
+    "description": "Итог",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "toDevices": "Back to devices",
+  "@toDevices": {
+    "description": "Кнопка"
+  },
+  "receivedFiles": "Received from “{name}”: {count, plural, =1{1 file} other{{count} files}}",
+  "@receivedFiles": {
+    "description": "Уведомление",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "receivedText": "Text from “{name}”",
+  "@receivedText": {
+    "description": "Заголовок",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "peerRemoved": "“{name}” is no longer linked to this device",
+  "@peerRemoved": {
+    "description": "Уведомление",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "preparingShare": "Preparing {count, plural, =1{1 file} other{{count} files}}…",
+  "@preparingShare": {
+    "description": "Уведомление",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "shareChoose": "Send to…",
+  "@shareChoose": {
+    "description": "Заголовок"
+  },
+  "shareNoDevices": "Add a device first — show a code or scan one.",
+  "@shareNoDevices": {
+    "description": "Подсказка"
+  },
+  "downloadsFolder": "Folder for received files",
+  "@downloadsFolder": {
+    "description": "Раздел"
+  },
+  "change": "Change",
+  "@change": {
+    "description": "Кнопка"
+  },
+  "resetDefault": "Default",
+  "@resetDefault": {
+    "description": "Кнопка"
+  },
+  "whereFiles": "Where to find files",
+  "@whereFiles": {
+    "description": "Раздел"
+  },
+  "whereFilesAndroid": "Files → Downloads → Ogneliss Share",
+  "@whereFilesAndroid": {
+    "description": "Путь к файлам на Android"
+  },
+  "whereFilesIos": "Files → On My iPhone → Ogneliss Share",
+  "@whereFilesIos": {
+    "description": "Путь к файлам на iOS"
+  },
+  "about": "About",
+  "@about": {
+    "description": "Раздел"
+  },
+  "howItWorks": "How it works",
+  "@howItWorks": {
+    "description": "Раздел"
+  },
+  "howItWorksBody": "There are no accounts. Every device has its own key created on the device itself; devices recognize each other by these keys.\n\nDevices can only be linked with a QR code shown on screen: a stranger can neither connect nor send a file — such connections are rejected right away.\n\nFiles go directly between devices, encrypted (QUIC, TLS 1.3). If a direct path is impossible, data goes through a relay, which only sees the encrypted stream.\n\nAfter a connection drop the transfer resumes where it stopped, and every file is verified with a BLAKE3 hash.",
+  "@howItWorksBody": {
+    "description": "Пояснение"
+  },
+  "logs": "Log",
+  "@logs": {
+    "description": "Пункт"
+  },
+  "version": "Version {version}",
+  "@version": {
+    "description": "Версия приложения",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "license": "Open source, Apache License 2.0",
+  "@license": {
+    "description": "Пункт"
+  },
+  "legalese": "© 2026 Oleg Ermishin · Apache License 2.0",
+  "@legalese": {
+    "description": "Правообладатель"
+  },
+  "sourceCode": "Source code",
+  "@sourceCode": {
+    "description": "Пункт"
+  },
+  "website": "Website",
+  "@website": {
+    "description": "Пункт"
+  },
+  "relay": "Relay",
+  "@relay": {
+    "description": "Пункт"
+  },
+  "relayPublic": "public (n0)",
+  "@relayPublic": {
+    "description": "Ретранслятор по умолчанию"
+  },
+  "startupError": "Could not start the app core",
+  "@startupError": {
+    "description": "Ошибка запуска"
+  },
+  "errorUnreachable": "The device is unreachable. Make sure Ogneliss Share is open on it and it has internet or shares your Wi-Fi.",
+  "@errorUnreachable": {
+    "description": "Ошибка"
+  },
+  "errorExpired": "The code has expired or was already used. Ask for a new one.",
+  "@errorExpired": {
+    "description": "Ошибка"
+  },
+  "errorDeclined": "Declined on the other device.",
+  "@errorDeclined": {
+    "description": "Ошибка"
+  },
+  "errorBusy": "Too many connection attempts. Try again in a minute.",
+  "@errorBusy": {
+    "description": "Ошибка"
+  },
+  "errorTimeout": "No answer from the other device.",
+  "@errorTimeout": {
+    "description": "Ошибка"
+  },
+  "errorRemoved": "The device is no longer linked.",
+  "@errorRemoved": {
+    "description": "Ошибка"
+  },
+  "errorBadLink": "This is not an Ogneliss Share code.",
+  "@errorBadLink": {
+    "description": "Ошибка"
+  },
+  "errorOwnLink": "This is the code of this very device.",
+  "@errorOwnLink": {
+    "description": "Ошибка"
+  },
+  "errorStorage": "Could not save the files.",
+  "@errorStorage": {
+    "description": "Ошибка"
+  },
+  "errorNoSpace": "Not enough free space on the receiving device.",
+  "@errorNoSpace": {
+    "description": "Ошибка"
+  },
+  "errorInterrupted": "The connection was lost. Tap “Retry” — the transfer resumes where it stopped.",
+  "@errorInterrupted": {
+    "description": "Ошибка"
+  },
+  "errorVerify": "Some files were damaged on the way and were not saved. Tap “Retry”.",
+  "@errorVerify": {
+    "description": "Ошибка"
+  },
+  "errorRead": "Could not read the file.",
+  "@errorRead": {
+    "description": "Ошибка"
+  },
+  "errorEmpty": "Nothing to send.",
+  "@errorEmpty": {
+    "description": "Ошибка"
+  },
+  "errorTooBig": "Too many files or the text is too long.",
+  "@errorTooBig": {
+    "description": "Ошибка"
+  },
+  "errorBadPath": "Invalid file names.",
+  "@errorBadPath": {
+    "description": "Ошибка"
+  },
+  "errorProtocol": "The other device runs an incompatible version of the app.",
+  "@errorProtocol": {
+    "description": "Ошибка"
+  },
+  "errorNotFound": "Device not found.",
+  "@errorNotFound": {
+    "description": "Ошибка"
+  },
+  "errorGeneric": "Something went wrong.",
+  "@errorGeneric": {
+    "description": "Ошибка"
+  },
+  "unitB": "B",
+  "@unitB": {
+    "description": "байт"
+  },
+  "unitKB": "KB",
+  "@unitKB": {
+    "description": "килобайт"
+  },
+  "unitMB": "MB",
+  "@unitMB": {
+    "description": "мегабайт"
+  },
+  "unitGB": "GB",
+  "@unitGB": {
+    "description": "гигабайт"
+  },
+  "unitTB": "TB",
+  "@unitTB": {
+    "description": "терабайт"
+  },
+  "perSecond": "{size}/s",
+  "@perSecond": {
+    "description": "Скорость",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "secondsShort": "{n} s",
+  "@secondsShort": {
+    "description": "Длительность",
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "minutesShort": "{n} min",
+  "@minutesShort": {
+    "description": "Длительность",
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursShort": "{h} h",
+  "@hoursShort": {
+    "description": "Длительность",
+    "placeholders": {
+      "h": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursMinutesShort": "{h} h {m} min",
+  "@hoursMinutesShort": {
+    "description": "Длительность",
+    "placeholders": {
+      "h": {
+        "type": "int"
+      },
+      "m": {
+        "type": "int"
+      }
+    }
+  },
+  "justNow": "just now",
+  "@justNow": {
+    "description": "Время"
+  },
+  "minutesAgo": "{n} min ago",
+  "@minutesAgo": {
+    "description": "Время",
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursAgo": "{n} h ago",
+  "@hoursAgo": {
+    "description": "Время",
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "yesterday": "yesterday",
+  "@yesterday": {
+    "description": "Время"
+  },
+  "permissionCamera": "The camera is used to scan the QR code of another device.",
+  "@permissionCamera": {
+    "description": "Системный запрос доступа к камере (NSCameraUsageDescription)"
+  },
+  "permissionLocalNetwork": "Ogneliss Share sends files directly between your devices on the local network.",
+  "@permissionLocalNetwork": {
+    "description": "Системный запрос доступа к локальной сети (NSLocalNetworkUsageDescription)"
+  }
+}

@@ -14,9 +14,20 @@ coverage/
 # Rust
 rust/target/
 
-# Каталоги платформ создаёт tool/bootstrap.py (flutter create + накладка
-# tool/platform). Их служебные части — в .gitignore каждого каталога,
-# здесь — то, что не должно попасть в git ни при каких условиях:
+# Классы локализации создаёт flutter gen-l10n из lib/l10n/*.arb
+lib/l10n/app_localizations*.dart
+
+# Каталоги платформ целиком создаёт tool/bootstrap.py (flutter create +
+# накладка tool/platform) — в git их нет; свои файлы для них — в tool/platform.
+/android/
+/ios/
+/macos/
+/windows/
+/linux/
+/.metadata
+
+# И на случай, если каталоги платформ всё же добавят в git, — то, что туда
+# не должно попасть ни при каких условиях:
 android/key.properties
 android/local.properties
 *.jks

@@ -4,11 +4,14 @@
 Каталоги android/ ios/ macos/ windows/ linux/ создаёт `flutter create`
 (шаблон той версии Flutter, что установлена), а этот скрипт:
   1) кладёт поверх «накладку» из tool/platform/ — значки, AndroidManifest,
-     MainActivity с «Поделиться» и инициализацией ядра;
+     MainActivity с «Поделиться» и инициализацией ядра, строки Android;
   2) правит настройки: идентификаторы com.ogneliss.share, названия
      «Ogneliss Share», разрешения камеры и локальной сети, права песочницы
      macOS, подпись Android-сборки ключом из android/key.properties;
-  3) выполняет `flutter pub get`.
+  3) переводит системные тексты: запросы разрешений iOS и macOS берутся из
+     lib/l10n/app_*.arb (InfoPlist.strings для en и ru), меню macOS — из
+     tool/l10n/macos_menu.json;
+  4) выполняет `flutter pub get` и `flutter gen-l10n`.
 
 Запуск из корня репозитория (нужен Flutter в PATH):
 
@@ -17,16 +20,21 @@
 Повторный запуск безопасен: существующие файлы `flutter create` не трогает,
 а правки применяются только там, где их ещё нет.
 """
+import hashlib
+import json
 import os
 import plistlib
 import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OVERLAY = ROOT / 'tool' / 'platform'
+L10N = ROOT / 'lib' / 'l10n'
+MAC_MENU = ROOT / 'tool' / 'l10n' / 'macos_menu.json'
 
 ORG = 'com.ogneliss'
 PROJECT = 'ogneliss_share'
@@ -34,11 +42,21 @@ APP_ID = 'com.ogneliss.share'
 TITLE = 'Ogneliss Share'
 AUTHOR = 'Ermishin Oleg'
 PLATFORMS = ['android', 'ios', 'macos', 'windows', 'linux']
+LANGS = ['en', 'ru']
 
-CAMERA_RU_EN = ('Камера нужна, чтобы отсканировать QR-код другого устройства. '
-                '/ The camera is used to scan the QR code of another device.')
-LOCAL_NET_RU_EN = ('Ogneliss Share передаёт файлы напрямую между вашими устройствами в локальной сети. '
-                   '/ Ogneliss Share sends files directly between your devices on the local network.')
+# Тексты системных запросов: ключ Info.plist → ключ в lib/l10n/app_*.arb.
+PERMISSION_TEXTS = {
+    'NSCameraUsageDescription': 'permissionCamera',
+    # iOS 14+ и macOS 15+ спрашивают разрешение на локальную сеть.
+    'NSLocalNetworkUsageDescription': 'permissionLocalNetwork',
+}
+
+# Консоль Windows по умолчанию не в UTF-8 — русские сообщения ломали запуск.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, ValueError):
+        pass
 
 
 def log(msg):
@@ -71,6 +89,154 @@ def must_sub(text, pattern, repl, path, count=0, flags=0):
         sys.exit(f'Не удалось применить правку к {path}: шаблон {pattern!r} не найден '
                  f'(изменился шаблон flutter create?)')
     return new
+
+
+def arb(lang):
+    return json.loads(read(L10N / f'app_{lang}.arb'))
+
+
+# ---------------------------------------------------------------- Xcode
+
+def pbx_id(name):
+    """Постоянный идентификатор объекта Xcode — одинаковый при каждом запуске."""
+    return hashlib.sha1(f'ogneliss-share/{name}'.encode()).hexdigest()[:24].upper()
+
+
+def pbx_find(text, comment, isa, path):
+    """Идентификатор объекта «ID /* comment */ = { isa = …; »."""
+    m = re.search(rf'\t\t([0-9A-F]{{24}}) /\* {re.escape(comment)} \*/ = \{{\n\t\t\tisa = {isa};', text)
+    if not m:
+        sys.exit(f'В {path} не найден объект {comment} ({isa}) — изменился шаблон flutter create?')
+    return m.group(1)
+
+
+def pbx_block(text, obj_id, path):
+    """Начало и конец описания объекта (не ссылок на него из списков)."""
+    m = re.search(rf'\n\t\t{obj_id} (?:/\*[^\n]*?\*/ )?= \{{', text)
+    if not m:
+        sys.exit(f'В {path} нет объекта {obj_id}')
+    return m.start() + 1, text.index('\n\t\t};', m.start() + 1)
+
+
+def pbx_add_to_list(text, obj_id, key, item, path):
+    """Добавить элемент в список «key = ( … );» объекта obj_id, если его там нет."""
+    start, end = pbx_block(text, obj_id, path)
+    block = text[start:end]
+    m = re.search(rf'\n(\t+){key} = \(\n(.*?)\1\);', block, flags=re.S)
+    if not m:
+        sys.exit(f'В {path} у объекта {obj_id} нет списка {key}')
+    items = [line.strip().rstrip(',') for line in m.group(2).splitlines()]
+    if item in items:
+        return text
+    block = block[:m.end(2)] + f'{m.group(1)}\t{item},\n' + block[m.end(2):]
+    return text[:start] + block + text[end:]
+
+
+def pbx_add_to_section(text, section, entry, path):
+    end = f'/* End {section} section */'
+    if end not in text:
+        sys.exit(f'В {path} нет раздела {section}')
+    return text.replace(end, entry + end, 1)
+
+
+def pbx_resources_phase(text, path):
+    """Шаг «Copy Bundle Resources» приложения (не тестов)."""
+    target = pbx_find(text, 'Runner', 'PBXNativeTarget', path)
+    start, end = pbx_block(text, target, path)
+    m = re.search(r'([0-9A-F]{24}) /\* Resources \*/', text[start:end])
+    if not m:
+        sys.exit(f'В {path} у цели Runner нет шага Resources')
+    return m.group(1)
+
+
+def pbx_file_ref(ref, lang, file_path):
+    return (f'\t\t{ref} /* {lang} */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.strings; '
+            f'name = {lang}; path = {file_path}; sourceTree = "<group>"; }};\n')
+
+
+def pbx_add_regions(text, langs, path):
+    project = pbx_find(text, 'Project object', 'PBXProject', path)
+    for lang in langs:
+        text = pbx_add_to_list(text, project, 'knownRegions', lang, path)
+    return text
+
+
+def pbx_add_localized(pbxproj, name, langs):
+    """Локализованный ресурс Runner/<язык>.lproj/<name> — в группу Runner
+    и в ресурсы приложения (группа вариантов, как делает Xcode)."""
+    text = read(pbxproj)
+    group = pbx_id(f'{name}/variants')
+    if group not in text:
+        build = pbx_id(f'{name}/build')
+        refs = [(lang, pbx_id(f'{name}/{lang}')) for lang in langs]
+        text = pbx_add_to_section(
+            text, 'PBXBuildFile',
+            f'\t\t{build} /* {name} in Resources */ = {{isa = PBXBuildFile; fileRef = {group} /* {name} */; }};\n',
+            pbxproj)
+        for lang, ref in refs:
+            text = pbx_add_to_section(text, 'PBXFileReference', pbx_file_ref(ref, lang, f'{lang}.lproj/{name}'),
+                                      pbxproj)
+        children = ''.join(f'\t\t\t\t{ref} /* {lang} */,\n' for lang, ref in refs)
+        text = pbx_add_to_section(
+            text, 'PBXVariantGroup',
+            f'\t\t{group} /* {name} */ = {{\n'
+            f'\t\t\tisa = PBXVariantGroup;\n'
+            f'\t\t\tchildren = (\n{children}\t\t\t);\n'
+            f'\t\t\tname = {name};\n'
+            f'\t\t\tsourceTree = "<group>";\n'
+            f'\t\t}};\n',
+            pbxproj)
+        runner = pbx_find(text, 'Runner', 'PBXGroup', pbxproj)
+        text = pbx_add_to_list(text, runner, 'children', f'{group} /* {name} */', pbxproj)
+        phase = pbx_resources_phase(text, pbxproj)
+        text = pbx_add_to_list(text, phase, 'files', f'{build} /* {name} in Resources */', pbxproj)
+    text = pbx_add_regions(text, langs, pbxproj)
+    write(pbxproj, text)
+
+
+def strings_file(entries):
+    """Файл .strings (UTF-8 Xcode принимает и сам переводит в нужный вид)."""
+    def q(s):
+        return s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+    lines = ['/* Создано tool/bootstrap.py — не править: источник в lib/l10n и tool/l10n. */', '']
+    lines += [f'"{q(k)}" = "{q(v)}";' for k, v in entries.items()]
+    return '\n'.join(lines) + '\n'
+
+
+def localize_info_plist(runner, pbxproj, keys):
+    """Запросы разрешений на языке системы: <язык>.lproj/InfoPlist.strings."""
+    for lang in LANGS:
+        texts = arb(lang)
+        folder = runner / f'{lang}.lproj'
+        folder.mkdir(exist_ok=True)
+        write(folder / 'InfoPlist.strings', strings_file({k: texts[v] for k, v in keys.items()}))
+    pbx_add_localized(pbxproj, 'InfoPlist.strings', LANGS)
+
+
+def localize_mac_menu(runner, pbxproj):
+    """Главное меню macOS по-русски: ru.lproj/MainMenu.strings к MainMenu.xib."""
+    xib = runner / 'Base.lproj' / 'MainMenu.xib'
+    table = json.loads(read(MAC_MENU))['ru']
+    entries = {}
+    for el in ET.parse(xib).iter():
+        title, oid = el.get('title'), el.get('id')
+        if el.tag in ('menu', 'menuItem') and title in table and oid:
+            entries[f'{oid}.title'] = table[title]
+    if not entries:
+        sys.exit(f'В {xib} не нашлось пунктов меню для перевода')
+    folder = runner / 'ru.lproj'
+    folder.mkdir(exist_ok=True)
+    write(folder / 'MainMenu.strings', strings_file(entries))
+
+    text = read(pbxproj)
+    ref = pbx_id('MainMenu.strings/ru')
+    if ref not in text:
+        text = pbx_add_to_section(text, 'PBXFileReference', pbx_file_ref(ref, 'ru', 'ru.lproj/MainMenu.strings'),
+                                  pbxproj)
+        menu = pbx_find(text, 'MainMenu.xib', 'PBXVariantGroup', pbxproj)
+        text = pbx_add_to_list(text, menu, 'children', f'{ref} /* ru */', pbxproj)
+    text = pbx_add_regions(text, ['ru'], pbxproj)
+    write(pbxproj, text)
 
 
 # ---------------------------------------------------------------- шаги
@@ -115,14 +281,18 @@ def patch_android():
     text = re.sub(r'applicationId = "[^"]+"', f'applicationId = "{APP_ID}"', text)
     if 'maxOf(flutter.minSdkVersion' not in text:
         text = must_sub(text, r'minSdk = flutter\.minSdkVersion', 'minSdk = maxOf(flutter.minSdkVersion, 24)', gradle)
+    # В скриптах Gradle на Kotlin «java» — это расширение проекта, а не пакет:
+    # класс Properties нужно импортировать (так было в прежних версиях скрипта).
+    text = text.replace('java.util.Properties()', 'Properties()')
     if 'keystoreProperties' not in text:
         signing_props = (
             '\n// Ключ подписи выпускаемой сборки — android/key.properties (в git не попадает):\n'
             '//   storeFile=…  storePassword=…  keyAlias=…  keyPassword=…\n'
             '// Нет файла — сборка подписывается отладочным ключом (для проверки, не для магазинов).\n'
-            'val keystoreProperties = java.util.Properties().apply {\n'
-            '    val f = rootProject.file("key.properties")\n'
-            '    if (f.exists()) f.inputStream().use { load(it) }\n'
+            'val keystoreProperties = Properties()\n'
+            'val keystorePropertiesFile = rootProject.file("key.properties")\n'
+            'if (keystorePropertiesFile.exists()) {\n'
+            '    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }\n'
             '}\n'
             'val hasReleaseKey = keystoreProperties.getProperty("storeFile") != null\n'
         )
@@ -149,6 +319,8 @@ def patch_android():
             'signingConfig = if (hasReleaseKey) signingConfigs.getByName("release") '
             'else signingConfigs.getByName("debug")',
             gradle, count=1)
+    if 'import java.util.Properties' not in text:
+        text = 'import java.util.Properties\n\n' + text
     write(gradle, text)
 
     props = ROOT / 'android' / 'gradle.properties'
@@ -181,28 +353,60 @@ def patch_bundle_ids(pbxproj):
     write(pbxproj, text)
 
 
+IOS_NO_BACKUP = '''\
+    // Ключ устройства и недокачанные файлы не попадают в резервные копии
+    // (iCloud, компьютер): копия, восстановленная на другом iPhone, не должна
+    // выдавать себя за это устройство. Полученные файлы копируются как обычно.
+    let fileManager = FileManager.default
+    var noBackup = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+    if let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+      noBackup.append(documents.appendingPathComponent(".ogneliss-share", isDirectory: true))
+    }
+    for directory in noBackup {
+      var url = directory
+      try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+      var values = URLResourceValues()
+      values.isExcludedFromBackup = true
+      try? url.setResourceValues(values)
+    }
+'''
+
+
 def patch_ios():
-    patch_plist(ROOT / 'ios' / 'Runner' / 'Info.plist', {
+    en = arb('en')
+    runner = ROOT / 'ios' / 'Runner'
+    pbxproj = ROOT / 'ios' / 'Runner.xcodeproj' / 'project.pbxproj'
+    patch_plist(runner / 'Info.plist', {
         'CFBundleDisplayName': TITLE,
         'CFBundleName': TITLE,
-        'CFBundleLocalizations': ['ru', 'en'],
-        'NSCameraUsageDescription': CAMERA_RU_EN,
-        'NSLocalNetworkUsageDescription': LOCAL_NET_RU_EN,
+        'CFBundleLocalizations': LANGS,
+        # Английский — по умолчанию; переводы — в <язык>.lproj/InfoPlist.strings.
+        **{key: en[arb_key] for key, arb_key in PERMISSION_TEXTS.items()},
         # Полученные файлы видны в «Файлах» → «На iPhone» → Ogneliss Share.
         'UIFileSharingEnabled': True,
         'LSSupportsOpeningDocumentsInPlace': True,
         # Шифрование — только стандартное (TLS 1.3/QUIC): экспортное освобождение.
         'ITSAppUsesNonExemptEncryption': False,
     })
-    patch_bundle_ids(ROOT / 'ios' / 'Runner.xcodeproj' / 'project.pbxproj')
-    log('ios: Info.plist и идентификатор')
+    patch_bundle_ids(pbxproj)
+    localize_info_plist(runner, pbxproj, PERMISSION_TEXTS)
+
+    delegate = runner / 'AppDelegate.swift'
+    text = read(delegate)
+    if 'isExcludedFromBackup' not in text:
+        text = must_sub(text, r'(\n)(    return super\.application\(application, didFinishLaunchingWithOptions)',
+                        lambda m: m.group(1) + IOS_NO_BACKUP + m.group(2), delegate, count=1)
+        write(delegate, text)
+    log('ios: Info.plist, переводы, идентификатор, без резервных копий ключа')
 
 
 def patch_macos():
+    en = arb('en')
     runner = ROOT / 'macos' / 'Runner'
+    pbxproj = ROOT / 'macos' / 'Runner.xcodeproj' / 'project.pbxproj'
     patch_plist(runner / 'Info.plist', {
-        'NSCameraUsageDescription': CAMERA_RU_EN,
-        'CFBundleLocalizations': ['ru', 'en'],
+        'CFBundleLocalizations': LANGS,
+        **{key: en[arb_key] for key, arb_key in PERMISSION_TEXTS.items()},
         'LSApplicationCategoryType': 'public.app-category.utilities',
     })
     entitlements = {
@@ -222,8 +426,10 @@ def patch_macos():
     text = re.sub(r'^PRODUCT_COPYRIGHT = .*$',
                   f'PRODUCT_COPYRIGHT = Copyright © 2026 {AUTHOR}. Apache License 2.0', text, flags=re.M)
     write(info, text)
-    patch_bundle_ids(ROOT / 'macos' / 'Runner.xcodeproj' / 'project.pbxproj')
-    log('macos: права песочницы, камера, название')
+    patch_bundle_ids(pbxproj)
+    localize_info_plist(runner, pbxproj, PERMISSION_TEXTS)
+    localize_mac_menu(runner, pbxproj)
+    log('macos: права песочницы, камера, название, переводы меню и запросов')
 
 
 def patch_windows():
@@ -265,6 +471,8 @@ def main():
     patch_linux()
     if '--no-pub' not in sys.argv:
         run([flutter_bin(), 'pub', 'get'])
+        # Классы переводов (lib/l10n/app_localizations*.dart) в git не хранятся.
+        run([flutter_bin(), 'gen-l10n'])
     log('готово')
 
 

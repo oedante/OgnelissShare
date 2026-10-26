@@ -5,11 +5,11 @@ import 'package:flutter/services.dart';
 
 import '../app/app_model.dart';
 import '../app/format.dart';
-import '../app/strings.dart';
 import '../app/theme.dart';
 import '../core/models.dart';
 import '../core/native.dart';
 import '../platform/files.dart';
+import '../l10n/l10n.dart';
 import 'shell.dart';
 
 class TransferTile extends StatelessWidget {
@@ -20,7 +20,7 @@ class TransferTile extends StatelessWidget {
   String _title() {
     if (item.isText) {
       final t = (item.text ?? '').replaceAll(RegExp(r'\s+'), ' ').trim();
-      return t.isEmpty ? tr.textItem : '${tr.textItem}: «$t»';
+      return t.isEmpty ? tr.textItem : tr.textPreview(t);
     }
     return formatNames(item.names, item.count);
   }
@@ -40,12 +40,7 @@ class TransferTile extends StatelessWidget {
       case 'retrying':
         return tr.statusRetrying;
       case 'active':
-        return tr.progress(
-          formatBytes(item.done),
-          formatBytes(item.total),
-          formatRate(item.rate),
-          formatLeft(item.done, item.total, item.rate),
-        );
+        return formatProgress(item.done, item.total, item.rate);
       case 'done':
         final base = item.outgoing ? tr.statusSent : tr.statusReceived;
         return item.isText ? base : '$base · ${formatBytes(item.total)}';
@@ -83,7 +78,8 @@ class TransferTile extends StatelessWidget {
     } else {
       iconColor = scheme.primary;
     }
-    final direction = item.outgoing ? '→ ${item.peerName}' : '← ${item.peerName}';
+    final peer = tr.deviceName(item.peerName);
+    final direction = item.outgoing ? '→ $peer' : '← $peer';
     final showProgress = item.isActive && !item.isText;
     final indeterminate = item.status != 'active';
 
@@ -152,9 +148,9 @@ class TransferTile extends StatelessWidget {
       out.add(IconButton(
         tooltip: tr.retry,
         icon: const Icon(Icons.refresh_rounded),
-        onPressed: () {
+        onPressed: () async {
           try {
-            model.retryTransfer(item.id);
+            await model.retryTransfer(item.id);
           } on CoreError catch (e) {
             showSnack(tr.error(e.code));
           }
@@ -169,8 +165,8 @@ class TransferTile extends StatelessWidget {
       ));
     } else if (!item.outgoing && item.isDone && item.savedTo != null) {
       out.add(IconButton(
-        tooltip: Files.isDirectory(item.savedTo!) ? tr.openFolder : tr.open,
-        icon: Icon(Files.isDirectory(item.savedTo!) ? Icons.folder_open_rounded : Icons.open_in_new_rounded),
+        tooltip: item.savedIsDir ? tr.openFolder : tr.open,
+        icon: Icon(item.savedIsDir ? Icons.folder_open_rounded : Icons.open_in_new_rounded),
         onPressed: () => Files.open(item.savedTo!),
       ));
     }
@@ -182,19 +178,22 @@ class TransferTile extends StatelessWidget {
     return out;
   }
 
-  void _copyText(AppModel model) {
-    final text = model.fullText(item.id) ?? item.text ?? '';
-    Clipboard.setData(ClipboardData(text: text));
+  Future<void> _copyText(AppModel model) async {
+    final text = await model.fullText(item.id) ?? item.text ?? '';
+    await Clipboard.setData(ClipboardData(text: text));
     showSnack(tr.copied, duration: const Duration(seconds: 2));
   }
 
   Future<void> _open(BuildContext context, AppModel model) async {
     if (item.isText) {
-      final text = model.fullText(item.id) ?? item.text ?? '';
+      final text = await model.fullText(item.id) ?? item.text ?? '';
+      final ctx = navigatorKey.currentContext;
+      if (ctx == null || !ctx.mounted) return;
+      final peer = tr.deviceName(item.peerName);
       await showDialog<void>(
-        context: context,
+        context: ctx,
         builder: (_) => TextDialog(
-          title: item.outgoing ? tr.sendTo(item.peerName) : tr.receivedText(item.peerName),
+          title: item.outgoing ? tr.sendTo(peer) : tr.receivedText(peer),
           text: text,
         ),
       );

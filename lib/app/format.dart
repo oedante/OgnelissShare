@@ -1,6 +1,9 @@
-// Размеры, скорости, «сколько осталось» и «когда был в сети».
+// Размеры, скорости, «сколько осталось» и «когда был в сети» — по правилам
+// текущего языка (intl).
 
-import 'strings.dart';
+import 'package:intl/intl.dart';
+
+import '../l10n/l10n.dart';
 
 /// 12,4 МБ / 12.4 MB.
 String formatBytes(int bytes) {
@@ -11,27 +14,22 @@ String formatBytes(int bytes) {
     value /= 1024;
     i++;
   }
-  final String number;
-  if (i == 0) {
-    number = '$bytes';
-  } else if (value >= 100) {
-    number = value.toStringAsFixed(0);
-  } else {
-    number = value.toStringAsFixed(1);
-  }
-  final localized = tr.isRu ? number.replaceAll('.', ',') : number;
-  return '$localized ${units[i]}';
+  final pattern = (i == 0 || value >= 100) ? '#,##0' : '#,##0.#';
+  final number = NumberFormat(pattern, tr.localeName).format(value);
+  return '$number ${units[i]}';
 }
 
 /// 5,2 МБ/с.
-String formatRate(int bytesPerSecond) => '${formatBytes(bytesPerSecond)}${tr.perSecond}';
+String formatRate(int bytesPerSecond) => tr.perSecond(formatBytes(bytesPerSecond));
 
 /// 8 с, 2 мин, 1 ч 5 мин.
 String formatDuration(int seconds) {
-  if (seconds < 60) return tr.seconds(seconds < 1 ? 1 : seconds);
+  if (seconds < 60) return tr.secondsShort(seconds < 1 ? 1 : seconds);
   final minutes = (seconds / 60).round();
-  if (minutes < 60) return tr.minutes(minutes);
-  return tr.hours(minutes ~/ 60, minutes % 60);
+  if (minutes < 60) return tr.minutesShort(minutes);
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  return m == 0 ? tr.hoursShort(h) : tr.hoursMinutesShort(h, m);
 }
 
 /// Сколько осталось при текущей скорости; null — не оценить.
@@ -42,7 +40,16 @@ String? formatLeft(int done, int total, int rate) {
   return formatDuration(seconds);
 }
 
-/// «только что», «5 мин назад», «вчера», «12.10.2026».
+/// Ход передачи: «12 из 50 МБ · 5 МБ/с · ещё 8 с».
+String formatProgress(int done, int total, int rate) {
+  final left = formatLeft(done, total, rate);
+  final d = formatBytes(done);
+  final t = formatBytes(total);
+  final r = formatRate(rate);
+  return left == null ? tr.progress(d, t, r) : tr.progressLeft(d, t, r, left);
+}
+
+/// «только что», «5 мин назад», «вчера», дата.
 String formatAgo(int unixSeconds, {DateTime? now}) {
   if (unixSeconds <= 0) return '';
   final at = DateTime.fromMillisecondsSinceEpoch(unixSeconds * 1000);
@@ -55,8 +62,7 @@ String formatAgo(int unixSeconds, {DateTime? now}) {
   final days = today.difference(day).inDays;
   if (days == 0) return tr.hoursAgo(diff.inHours);
   if (days == 1) return tr.yesterday;
-  String two(int v) => v.toString().padLeft(2, '0');
-  return tr.isRu ? '${two(at.day)}.${two(at.month)}.${at.year}' : '${at.year}-${two(at.month)}-${two(at.day)}';
+  return DateFormat.yMd(tr.localeName).format(at);
 }
 
 /// «отчёт.pdf», «a.jpg, b.jpg и ещё 1», «Фото · 120 файлов».
@@ -65,12 +71,12 @@ String formatNames(List<String> names, int count) {
   final shown = names.take(2).join(', ');
   if (count <= names.length) {
     final more = count - (names.length < 2 ? names.length : 2);
-    return tr.andMore(shown, more);
+    return more > 0 ? tr.andMore(shown, more) : shown;
   }
   return '$shown · ${tr.files(count)}';
 }
 
-/// Мм:сс для обратного отсчёта.
+/// М:сс для обратного отсчёта.
 String formatClock(int seconds) {
   final s = seconds < 0 ? 0 : seconds;
   return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';

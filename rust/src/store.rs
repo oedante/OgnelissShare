@@ -45,6 +45,7 @@ pub struct Saved {
     pub download_dir: String,
 }
 
+#[derive(Clone)]
 pub struct Store {
     dir: PathBuf,
 }

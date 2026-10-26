@@ -4,8 +4,14 @@ analyzer:
   exclude:
     # Cargokit — отдельный пакет Dart со своими зависимостями (сборка ядра).
     - rust_builder/**
-    - build/**
     - tool/**
+    # Сборка и каталоги платформ (их создаёт tool/bootstrap.py).
+    - build/**
+    - android/**
+    - ios/**
+    - macos/**
+    - windows/**
+    - linux/**
 
 linter:
   rules:

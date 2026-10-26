@@ -24,6 +24,8 @@ pub fn short_code(id: &EndpointId) -> String {
 }
 
 /// Имя устройства: без управляющих символов, обрезанное до 40 символов.
+/// Пустое имя остаётся пустым — подпись «Без имени» на своём языке
+/// подставляет интерфейс.
 pub fn clean_name(name: &str) -> String {
     let cleaned: String = name
         .chars()
@@ -33,7 +35,7 @@ pub fn clean_name(name: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ");
     let trimmed: String = cleaned.chars().take(40).collect();
-    if trimmed.is_empty() { "Устройство".to_string() } else { trimmed }
+    trimmed
 }
 
 /// Платформа — одно из известных значений, иначе «other».
@@ -63,7 +65,7 @@ mod tests {
     #[test]
     fn names_are_cleaned() {
         assert_eq!(clean_name("  Ноутбук\n Олега  "), "Ноутбук Олега");
-        assert_eq!(clean_name(""), "Устройство");
+        assert_eq!(clean_name(" \n "), "");
         assert_eq!(clean_name(&"x".repeat(100)).chars().count(), 40);
     }
 

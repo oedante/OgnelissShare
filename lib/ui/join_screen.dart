@@ -5,9 +5,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app/app_model.dart';
-import '../app/strings.dart';
 import '../app/theme.dart';
 import '../core/models.dart';
+import '../l10n/l10n.dart';
 import 'scan_screen.dart';
 import 'widgets.dart';
 
@@ -62,7 +62,7 @@ class _JoinScreenState extends State<JoinScreen> {
   Widget build(BuildContext context) {
     final info = widget.info;
     final theme = Theme.of(context);
-    final name = _name ?? info.name;
+    final name = tr.deviceName(_name ?? info.name);
     final Widget status;
     if (_ok == null) {
       status = Column(

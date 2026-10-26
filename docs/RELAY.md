@@ -1,40 +1,51 @@
-# Свой ретранслятор на ogneliss.ru
+# Ретранслятор (на развитие)
+
+> Сейчас не планируется: сборки Ogneliss Share используют общедоступные
+> ретрансляторы n0, своих серверов у проекта нет. Здесь — что понадобится,
+> если когда-нибудь появится свой или арендованный ретранслятор.
+
+## Зачем он нужен
 
 Когда два устройства не могут соединиться напрямую (разные сети, строгий
-NAT, мобильный интернет), данные идут через ретранслятор. Он пересылает
-уже зашифрованные пакеты: содержимого файлов не видит, видит только ключи
-устройств, IP-адреса, время и объём.
+NAT, мобильный интернет), данные идут через ретранслятор. Он пересылает уже
+зашифрованные пакеты: содержимого файлов не видит, видит ключи устройств,
+IP-адреса, время и объём. Через него же устройства договариваются о прямом
+соединении («пробивка» NAT).
 
-Пока в сборке не указан свой ретранслятор, приложение пользуется
-общедоступными ретрансляторами n0 (авторы iroh). Для выпуска лучше свой:
-предсказуемая доступность из России, никаких сторонних служб, свои
-ограничения скорости. Сервер нужен небольшой — 1 ядро, 512 МБ памяти;
-расход — только трафик тех передач, что не смогли пойти напрямую.
+Общедоступные ретрансляторы n0 бесплатны, но ограничивают скорость и не
+дают гарантий доступности; авторы iroh рекомендуют их для разработки и
+тестирования ([docs.iroh.computer/concepts/relays](https://docs.iroh.computer/concepts/relays)).
+Альтернативы — платные ретрансляторы n0 или свой сервер. Свой сервер
+означает весь трафик тех передач, что не смогли пойти напрямую, и
+ответственность за него.
 
-## 1. DNS
+## Как подключить свой в сборке
 
-Запись `A` (и `AAAA`, если есть IPv6): `relay.ogneliss.ru` → адрес сервера.
+Адреса ретрансляторов задаются при сборке переменной `OGNELISS_RELAYS`
+(через запятую), код — `Relays::from_build` в `rust/src/node.rs`:
 
-## 2. Порты
+- в GitHub: Settings → Secrets and variables → Actions → **Variables** →
+  `OGNELISS_RELAYS` = `https://relay.example.org`;
+- локально: `OGNELISS_RELAYS=https://relay.example.org flutter build apk`.
 
-| Порт | Протокол | Зачем |
-|---|---|---|
-| 80 | TCP | выпуск сертификата Let's Encrypt (ACME) |
-| 443 | TCP | ретранслятор (HTTPS/WebSocket) |
-| 7842 | UDP | определение внешнего адреса для пробивки NAT (QUIC) |
+Без переменной — общедоступные ретрансляторы n0. Сборки с разными
+ретрансляторами совместимы: адрес ретранслятора собеседника приходит в
+QR-коде и в приветствии, и устройство подключается через него.
 
-## 3. Установка
+## Сервер (кратко)
 
-На сервере с Rust (`curl https://sh.rustup.rs -sSf | sh`):
+Программа — `iroh-relay` той же версии, что iroh в `rust/Cargo.toml`:
 
 ```bash
 cargo install iroh-relay --version 1.4.1 --features server --locked
-sudo install -m 755 ~/.cargo/bin/iroh-relay /usr/local/bin/iroh-relay
-sudo useradd --system --home /var/lib/iroh-relay --create-home iroh-relay
-sudo mkdir -p /etc/iroh-relay
 ```
 
-`/etc/iroh-relay/relay.toml`:
+Порты: 80/TCP (выпуск сертификата Let's Encrypt), 443/TCP (ретранслятор),
+7842/UDP (определение внешнего адреса для пробивки NAT). Сертификат нужен
+от общепризнанного центра: приложение проверяет его по встроенному списку
+корневых сертификатов Mozilla.
+
+Пример `relay.toml`:
 
 ```toml
 enable_relay = true
@@ -44,13 +55,11 @@ enable_metrics = false
 
 [tls]
 cert_mode = "LetsEncrypt"
-hostname = "relay.ogneliss.ru"
-contact = "oedante@gmail.com"
+hostname = "relay.example.org"
+contact = "admin@example.org"
 cert_dir = "/var/lib/iroh-relay/certs"
-prod_tls = true
 
-# Защита от перегрузки: не больше 50 новых подключений в секунду
-# и 4 МБ/с на одно устройство (с запасом на рывки).
+# Защита от перегрузки: новые подключения и скорость на одно устройство.
 [limits]
 accept_conn_limit = 50.0
 accept_conn_burst = 200
@@ -60,54 +69,5 @@ bytes_per_second = 4194304
 max_burst_bytes = 16777216
 ```
 
-Сертификат должен быть от общепризнанного центра (Let's Encrypt): приложение
-проверяет его по встроенному списку корневых сертификатов Mozilla.
-
-`/etc/systemd/system/iroh-relay.service`:
-
-```ini
-[Unit]
-Description=iroh relay for Ogneliss Share
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-User=iroh-relay
-WorkingDirectory=/var/lib/iroh-relay
-ExecStart=/usr/local/bin/iroh-relay --config-path /etc/iroh-relay/relay.toml
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-Restart=always
-RestartSec=5
-NoNewPrivileges=true
-ProtectSystem=strict
-ReadWritePaths=/var/lib/iroh-relay
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now iroh-relay
-journalctl -u iroh-relay -f        # сертификат выпускается при первом запросе
-curl -I https://relay.ogneliss.ru  # должен ответить
-```
-
-## 4. Сборка приложения со своим ретранслятором
-
-Адреса ретрансляторов задаются при сборке переменной `OGNELISS_RELAYS`
-(через запятую):
-
-- в GitHub: Settings → Secrets and variables → Actions → **Variables** →
-  `OGNELISS_RELAYS` = `https://relay.ogneliss.ru` — следующие сборки CI
-  будут с ним;
-- локально: `OGNELISS_RELAYS=https://relay.ogneliss.ru flutter build apk`.
-
-В «Настройки → О приложении → Ретранслятор» видно, какой адрес в сборке.
-Со своим ретранслятором сторонние службы не используются совсем: устройства
-находят друг друга по последнему известному адресу, ретранслятору и mDNS
-в локальной сети.
-
-Сборки с разными ретрансляторами совместимы: адрес ретранслятора
-собеседника приходит в QR-коде и в приветствии, и устройство подключается
-через него.
+Запуск: `iroh-relay --config-path /etc/iroh-relay/relay.toml` (под
+отдельным пользователем, через systemd).

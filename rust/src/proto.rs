@@ -16,6 +16,9 @@ pub const ALPN: &[u8] = b"ogneliss-share/1";
 /// Предел управляющего сообщения: список из десятков тысяч файлов влезает.
 pub const MAX_MSG: usize = 8 * 1024 * 1024;
 
+/// Сообщение читается кусками не больше этого.
+const CHUNK: usize = 64 * 1024;
+
 /// Коды закрытия потоков и соединений.
 pub const CODE_CANCELLED: u32 = 1;
 /// Устройство не связано с нами: соединение отклонено.
@@ -112,8 +115,16 @@ pub async fn read_msg(recv: &mut RecvStream) -> Result<Msg> {
     if len > MAX_MSG {
         bail!("message too large: {len}");
     }
-    let mut body = vec![0u8; len];
-    recv.read_exact(&mut body).await.context("read body")?;
+    // Память — по мере прихода данных, а не сразу на заявленную длину:
+    // иначе каждый поток мог бы заставить выделить по 8 МБ заранее.
+    let mut body = Vec::with_capacity(len.min(CHUNK));
+    while body.len() < len {
+        let want = (len - body.len()).min(CHUNK);
+        match recv.read_chunk(want).await.context("read body")? {
+            Some(chunk) => body.extend_from_slice(&chunk),
+            None => bail!("stream finished early"),
+        }
+    }
     serde_json::from_slice(&body).context("parse message")
 }
 

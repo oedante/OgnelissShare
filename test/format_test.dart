@@ -1,16 +1,24 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:ogneliss_share/app/format.dart';
-import 'package:ogneliss_share/app/strings.dart';
 import 'package:ogneliss_share/core/models.dart';
+import 'package:ogneliss_share/l10n/l10n.dart';
 
 void main() {
+  setUpAll(() async {
+    await initializeDateFormatting('ru');
+    await initializeDateFormatting('en');
+  });
+
   group('русский', () {
-    setUp(() => S.current = const SRu());
+    setUp(() => setTr(lookupAppLocalizations(const Locale('ru'))));
 
     test('размеры', () {
       expect(formatBytes(0), '0 Б');
       expect(formatBytes(1536), '1,5 КБ');
       expect(formatBytes(150 * 1024 * 1024), '150 МБ');
+      expect(formatRate(1536), '1,5 КБ/с');
     });
 
     test('множественное число', () {
@@ -35,18 +43,37 @@ void main() {
       expect(formatAgo(ago(const Duration(minutes: 5)), now: now), '5 мин назад');
       expect(formatAgo(ago(const Duration(hours: 3)), now: now), '3 ч назад');
       expect(formatAgo(ago(const Duration(hours: 20)), now: now), 'вчера');
+      expect(formatAgo(ago(const Duration(days: 5)), now: now), '21.10.2026');
       expect(formatClock(299), '4:59');
       expect(formatDuration(90), '2 мин');
+      expect(formatDuration(3900), '1 ч 5 мин');
       expect(formatLeft(0, 100, 0), isNull);
+    });
+
+    test('ошибки и пустые имена', () {
+      expect(tr.error('unreachable'), contains('недоступно'));
+      expect(tr.error('что-то новое'), 'Не получилось.');
+      expect(tr.deviceName(''), 'Без имени');
+      expect(tr.deviceName('Ноутбук'), 'Ноутбук');
     });
   });
 
   test('english', () {
-    S.current = const SEn();
+    setTr(lookupAppLocalizations(const Locale('en')));
     expect(formatBytes(1536), '1.5 KB');
     expect(tr.files(1), '1 file');
     expect(tr.files(2), '2 files');
-    S.current = const SRu();
+    expect(formatNames(['a.jpg', 'b.jpg', 'c.jpg'], 3), 'a.jpg, b.jpg and 1 more');
+    expect(tr.error('no_space'), contains('space'));
+  });
+
+  test('язык по системе', () {
+    expect(appLocale(const [Locale('ru', 'RU')]), const Locale('ru'));
+    expect(appLocale(const [Locale('uk')]), const Locale('ru'));
+    expect(appLocale(const [Locale('de'), Locale('ru')]), const Locale('ru'));
+    expect(appLocale(const [Locale('en', 'US'), Locale('ru')]), const Locale('en'));
+    expect(appLocale(const [Locale('fr')]), const Locale('en'));
+    expect(appLocale(null), const Locale('en'));
   });
 
   test('снимок состояния разбирается', () {
@@ -61,7 +88,16 @@ void main() {
         {'id': 'r1', 'kind': 'pair', 'peer': 'p3', 'name': 'Планшет', 'code': '1234'},
       ],
       'transfers': [
-        {'id': 't1', 'dir': 'out', 'kind': 'files', 'total': 100, 'done': 50, 'status': 'active', 'names': ['a']},
+        {
+          'id': 't1',
+          'dir': 'in',
+          'kind': 'files',
+          'total': 100,
+          'done': 50,
+          'status': 'active',
+          'names': ['a'],
+          'saved_is_dir': true,
+        },
       ],
     });
     expect(snap.me.name, 'Ноутбук');
@@ -70,8 +106,10 @@ void main() {
     expect(snap.peer('p1')?.name, 'Телефон');
     expect(snap.invite, isNull);
     expect(snap.requests.single.code, '1234');
-    expect(snap.transfers.single.progress, 0.5);
-    expect(snap.transfers.single.outgoing, isTrue);
-    expect(snap.transfers.single.isActive, isTrue);
+    final t = snap.transfers.single;
+    expect(t.progress, 0.5);
+    expect(t.outgoing, isFalse);
+    expect(t.isActive, isTrue);
+    expect(t.savedIsDir, isTrue);
   });
 }

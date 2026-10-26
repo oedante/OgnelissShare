@@ -10,9 +10,9 @@
 #    (только этот каталог, без кода) — чтобы разбирать ошибки сборки без
 #    доступа к интерфейсу Actions. Ветку можно удалить в любой момент.
 #
-# Свои ретрансляторы (вместо общедоступных n0): Settings → Secrets and
-# variables → Actions → Variables → OGNELISS_RELAYS, например
-# https://relay.ogneliss.ru (см. docs/RELAY.md).
+# Ретрансляторы — общедоступные n0. На будущее можно собрать со своими:
+# Settings → Secrets and variables → Actions → Variables → OGNELISS_RELAYS
+# (адреса через запятую, см. docs/RELAY.md). Сейчас не используется.
 # Подпись Android: секреты ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
 # ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD; без них — отладочный ключ.
 
@@ -35,6 +35,8 @@ concurrency:
 env:
   OGNELISS_RELAYS: ${{ vars.OGNELISS_RELAYS }}
   CARGO_TERM_COLOR: never
+  # Русские сообщения скриптов в консоли Windows.
+  PYTHONUTF8: '1'
 
 defaults:
   run:
@@ -246,6 +248,11 @@ jobs:
           python tool/bootstrap.py 2>&1 | tee ci-logs/macos.log
       - name: Сборка
         run: flutter build macos --release 2>&1 | tee -a ci-logs/macos.log
+      - name: Подробности ошибки ядра
+        # Xcode показывает от сборки Rust только последнюю строку — здесь полный текст.
+        if: ${{ failure() }}
+        working-directory: rust
+        run: cargo build --release --target aarch64-apple-darwin 2>&1 | tail -n 200 | tee -a ../ci-logs/macos.log || true
       - name: Архив
         run: |
           ditto -c -k --sequesterRsrc --keepParent \
@@ -283,6 +290,13 @@ jobs:
           python tool/bootstrap.py 2>&1 | tee ci-logs/ios.log
       - name: Сборка
         run: flutter build ios --release --no-codesign 2>&1 | tee -a ci-logs/ios.log
+      - name: Подробности ошибки ядра
+        # Xcode показывает от сборки Rust только последнюю строку — здесь полный текст.
+        if: ${{ failure() }}
+        working-directory: rust
+        run: |
+          rustup target add aarch64-apple-ios
+          cargo build --release --target aarch64-apple-ios 2>&1 | tail -n 200 | tee -a ../ci-logs/ios.log || true
       - name: Архив
         run: |
           mkdir -p Payload

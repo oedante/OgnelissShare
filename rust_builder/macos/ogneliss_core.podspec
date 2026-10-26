@@ -18,6 +18,10 @@ Pod::Spec.new do |s|
   s.dependency 'FlutterMacOS'
   s.platform = :osx, '10.15'
   s.swift_version = '5.0'
+  # Системные библиотеки, которые нужны ядру (rustc --print native-static-libs):
+  # сеть и DNS — SystemConfiguration; TLS — Security.
+  s.frameworks = 'SystemConfiguration', 'Security', 'CoreFoundation', 'Foundation'
+  s.libraries = 'iconv', 'objc'
 
   s.script_phase = {
     :name => 'Build Rust library',
@@ -30,8 +34,6 @@ Pod::Spec.new do |s|
   }
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    # Во Flutter.framework нет среза i386.
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
     'OTHER_LDFLAGS' => '-force_load ${BUILT_PRODUCTS_DIR}/libogneliss_core.a',
   }
 end

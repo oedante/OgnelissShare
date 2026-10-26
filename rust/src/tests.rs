@@ -167,12 +167,12 @@ async fn pair_send_text_and_forget() {
     // «Забыть устройство» на A — B узнаёт и тоже убирает A.
     a.remove_peer(&b.id()).unwrap();
     let mut ev = Vec::new();
+    // Событие приходит чуть позже, чем A исчезает из списка, — ждём обоих.
     wait_for("B забыл A", 10, || {
         events(&b, &mut ev);
-        peer_ids(&b).is_empty()
+        peer_ids(&b).is_empty() && ev.iter().any(|e| e["type"] == "peer_removed")
     })
     .await;
-    assert!(ev.iter().any(|e| e["type"] == "peer_removed"));
     // И больше не может прислать файл.
     assert!(b.send_files(a.id(), vec![src.join("doc.txt")]).is_err());
 }

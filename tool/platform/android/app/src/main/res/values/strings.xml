@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Название — товарный знак, на всех языках одинаковое. Остальные
+         тексты интерфейса — в lib/l10n (Flutter). -->
+    <string name="app_name" translatable="false">Ogneliss Share</string>
+</resources>

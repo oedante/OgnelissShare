@@ -194,6 +194,7 @@ class TransferItem {
     required this.text,
     required this.textTruncated,
     required this.savedTo,
+    required this.savedIsDir,
     required this.failedFiles,
     required this.started,
     required this.finished,
@@ -217,6 +218,7 @@ class TransferItem {
         text: _strOrNull(j['text']),
         textTruncated: _bool(j['text_truncated']),
         savedTo: _strOrNull(j['saved_to']),
+        savedIsDir: _bool(j['saved_is_dir']),
         failedFiles: _int(j['failed_files']),
         started: _int(j['started']),
         finished: _int(j['finished']),
@@ -244,6 +246,9 @@ class TransferItem {
   final String? text;
   final bool textTruncated;
   final String? savedTo;
+
+  /// [savedTo] — папка (несколько файлов или папка целиком).
+  final bool savedIsDir;
   final int failedFiles;
   final int started;
   final int finished;

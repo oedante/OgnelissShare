@@ -50,14 +50,16 @@ Windows, macOS и Linux. **Без учётных записей, без обла
   постоянную связь подтверждают 4 цифры на обоих экранах (защита от того,
   кто сфотографировал код издалека). Код одноразовый и живёт 5 минут.
 - **Сквозное шифрование.** QUIC и TLS 1.3 со взаимной проверкой ключей
-  ([iroh](https://github.com/n0-computer/iroh)). Если прямой путь
-  невозможен, данные идут через ретранслятор — он видит только
-  зашифрованный поток, ключи устройств и IP-адреса.
-- Ключ устройства не попадает в резервные копии Android.
+  ([iroh](https://github.com/n0-computer/iroh)).
+- **Своих серверов нет.** Обычно файлы идут напрямую: в одной сети Wi-Fi
+  или через интернет после «пробивки» NAT. Если прямой путь невозможен,
+  данные идут через общедоступные ретрансляторы n0 (авторы iroh) — они
+  видят только зашифрованный поток, ключи устройств и IP-адреса. Эти
+  ретрансляторы бесплатные, но с ограничением скорости и без гарантий
+  доступности.
+- Ключ устройства не попадает в резервные копии Android и iCloud.
 
-Подробно — [docs/PROTOCOL.md](docs/PROTOCOL.md). Свой ретранслятор на
-ogneliss.ru — [docs/RELAY.md](docs/RELAY.md) (пока не указан, сборки
-используют общедоступные ретрансляторы n0).
+Подробно — [docs/PROTOCOL.md](docs/PROTOCOL.md).
 
 ## Как устроено
 
@@ -80,12 +82,15 @@ docs/          протокол, ретранслятор
 для Linux.
 
 ```bash
-python3 tool/bootstrap.py   # один раз: каталоги платформ + flutter pub get
+python3 tool/bootstrap.py   # один раз: каталоги платформ, пакеты, переводы
 flutter run                 # на подключённом устройстве или компьютере
 flutter build apk --release --split-per-abi
 
 cd rust && cargo test       # тесты ядра (без Flutter)
 ```
+
+Пошагово для Android и Windows (что установить, команды, проверка) —
+[docs/BUILD.md](docs/BUILD.md).
 
 `bootstrap.py` создаёт `android/`, `ios/`, `macos/`, `windows/`, `linux/`
 через `flutter create` и накладывает свои файлы и правки: идентификатор
@@ -98,11 +103,13 @@ cd rust && cargo test       # тесты ядра (без Flutter)
 
 ## Что дальше
 
-- Свой ретранслятор `relay.ogneliss.ru`.
 - Приём файлов в фоне на Android (служба переднего плана) и уведомления.
 - «Поделиться» на iOS (расширение), перетаскивание файлов на компьютере.
 - Общий буфер обмена между своими устройствами.
 - Публикация в Google Play, RuStore, App Store.
+
+На развитие (сейчас не планируется): сборка со своим ретранслятором —
+см. [docs/RELAY.md](docs/RELAY.md).
 
 ---
 
@@ -128,17 +135,21 @@ rejected right after the handshake, so nobody can spam you or even see
 that your device is online. Connections are made to the key from the QR
 code, and permanent links are confirmed with matching digits on both
 screens. Traffic is end-to-end encrypted (QUIC, TLS 1.3, mutual key
-authentication via [iroh](https://github.com/n0-computer/iroh)); a relay,
-when needed, only sees encrypted packets. Details:
+authentication via [iroh](https://github.com/n0-computer/iroh)). There
+are no servers of our own: files usually go directly (same Wi-Fi or NAT
+hole punching); otherwise they pass through the free public n0 relays,
+which only see encrypted packets. Details:
 [docs/PROTOCOL.md](docs/PROTOCOL.md).
 
 **Build.** Flutter (stable, 3.38+), Rust 1.91+ and the platform toolchain:
 
 ```bash
-python3 tool/bootstrap.py   # once: platform folders + pub get
+python3 tool/bootstrap.py   # once: platform folders, packages, translations
 flutter run
 cd rust && cargo test
 ```
+
+Step by step for Android and Windows: [docs/BUILD.md](docs/BUILD.md).
 
 The name “Ogneliss” and the icon are not covered by the license — see
 [TRADEMARKS.md](TRADEMARKS.md).

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Языки интерфейса — для выбора языка приложения в настройках Android 13+.
+     Должны совпадать с lib/l10n/app_*.arb. -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="ru" />
+</locale-config>

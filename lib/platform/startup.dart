@@ -1,6 +1,7 @@
 // Запуск ядра: где хранить данные, куда класть полученные файлы и как
 // назвать устройство по умолчанию.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -9,15 +10,15 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../app/app_model.dart';
-import '../core/native.dart';
+import '../core/core_client.dart';
 import 'platform_bridge.dart';
 
-class CoreStart {
-  const CoreStart({this.model, this.error});
+bool get isMobile => Platform.isAndroid || Platform.isIOS;
 
-  final AppModel? model;
-  final String? error;
-}
+bool get isDesktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+
+/// Сканер QR-кодов есть на телефонах и Mac (камера через системные средства).
+bool get canScan => Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
 
 String get platformCode {
   if (Platform.isAndroid) return 'android';
@@ -28,34 +29,23 @@ String get platformCode {
   return 'other';
 }
 
-bool get isMobile => Platform.isAndroid || Platform.isIOS;
-
-bool get isDesktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
-
-/// Сканер QR-кодов есть на телефонах и Mac (камера через системные средства).
-bool get canScan => Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
-
-Future<CoreStart> startCore() async {
-  try {
-    final native = Native.open();
-    final data = await getApplicationSupportDirectory();
-    final downloads = await defaultDownloadDir();
-    final name = await defaultDeviceName();
-    native.call('init', {
-      'data_dir': data.path,
-      'download_dir': downloads,
-      'name': name,
-      'platform': platformCode,
-    });
-    if (Platform.isAndroid || Platform.isIOS) {
-      // Копии файлов, выбранных в прошлый раз, больше не нужны.
-      FilePicker.clearTemporaryFiles().catchError((_) {});
-    }
-    final model = AppModel(native)..start();
-    return CoreStart(model: model);
-  } catch (e, st) {
-    return CoreStart(error: '$e\n\n$st');
+/// Запустить ядро. Пути и имя устройства узнаются здесь (каналы платформы
+/// работают только в основном изоляте), а само ядро — в своём изоляте.
+Future<AppModel> startApp() async {
+  final data = await getApplicationSupportDirectory();
+  final downloads = await defaultDownloadDir();
+  final name = await defaultDeviceName();
+  final core = await CoreClient.start({
+    'data_dir': data.path,
+    'download_dir': downloads,
+    'name': name,
+    'platform': platformCode,
+  });
+  if (Platform.isAndroid || Platform.isIOS) {
+    // Копии файлов, выбранных в прошлый раз, больше не нужны.
+    unawaited(FilePicker.clearTemporaryFiles().catchError((_) {}));
   }
+  return AppModel(core);
 }
 
 /// Куда сохранять полученное.

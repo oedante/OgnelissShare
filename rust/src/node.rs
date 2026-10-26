@@ -11,7 +11,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
@@ -54,7 +54,7 @@ pub(crate) const DIAL_TIMEOUT: Duration = Duration::from_secs(20);
 pub enum Relays {
     /// Общедоступные ретрансляторы n0 — пока не развёрнут свой.
     Default,
-    /// Свои ретрансляторы, например `https://relay.ogneliss.ru`.
+    /// Свои ретрансляторы (на будущее; сейчас сборки идут с общедоступными).
     Custom(Vec<RelayUrl>),
     /// Без ретранслятора: только прямые адреса (тесты, локальная сеть).
     Disabled,
@@ -267,7 +267,7 @@ impl State {
         if let Some(s) = self.sessions.get(id) {
             return s.name.clone();
         }
-        "Устройство".to_string()
+        String::new()
     }
 
     fn is_online(&mut self, id: &EndpointId) -> bool {
@@ -286,6 +286,17 @@ pub struct Node {
     pub(crate) state: Mutex<State>,
     pub(crate) cancel: CancellationToken,
     kick: Notify,
+    /// Список устройств изменился и ещё не записан на диск.
+    dirty: AtomicBool,
+    save_kick: Notify,
+}
+
+/// Сколько адресов собеседника храним: больше не нужно, а чужой список
+/// не должен разрастаться без предела.
+const MAX_ADDRS: usize = 16;
+
+fn trim_addr(addr: EndpointAddr) -> EndpointAddr {
+    EndpointAddr::from_parts(addr.id, addr.addrs.into_iter().take(MAX_ADDRS))
 }
 
 impl Node {
@@ -347,6 +358,8 @@ impl Node {
             }),
             cancel: CancellationToken::new(),
             kick: Notify::new(),
+            dirty: AtomicBool::new(false),
+            save_kick: Notify::new(),
             cfg,
         });
         node.events.log(format!(
@@ -358,6 +371,7 @@ impl Node {
         tokio::spawn(node.clone().accept_loop());
         tokio::spawn(node.clone().presence_loop());
         tokio::spawn(node.clone().watch_network());
+        tokio::spawn(node.clone().save_loop());
         let roots = [download_dir.join(crate::transfer::STAGE_DIR), node.cfg.data_dir.join("stage")];
         tokio::task::spawn_blocking(move || roots.iter().for_each(|r| crate::transfer::cleanup_stale(r)));
         Ok(node)
@@ -365,6 +379,7 @@ impl Node {
 
     pub async fn shutdown(&self) {
         self.cancel.cancel();
+        self.flush();
         self.ep.close().await;
     }
 
@@ -410,18 +425,46 @@ impl Node {
         self.events.changed();
     }
 
-    /// Куда принимать недокачанное: рядом с папкой загрузок (тогда перенос
-    /// на место — простое переименование), а если там нельзя создать
-    /// служебную папку — в данные приложения.
+    /// Куда принимать недокачанное (только из фоновых потоков: создаёт папку).
+    #[cfg(test)]
     pub(crate) fn stage_root(&self) -> PathBuf {
-        let root = self.download_dir().join(crate::transfer::STAGE_DIR);
-        if std::fs::create_dir_all(&root).is_ok() { root } else { self.cfg.data_dir.join("stage") }
+        crate::transfer::stage_root(&self.download_dir(), &self.cfg.data_dir)
     }
 
+    /// Записать список устройств. Сама запись — в фоновом потоке
+    /// (save_loop): вызывающий не ждёт диска, а частые изменения
+    /// схлопываются в одну запись последнего состояния.
     fn save(&self) {
-        let saved = self.with(|s| s.saved.clone());
-        if let Err(e) = self.store.save_state(&saved) {
-            self.events.log(format!("save: {e:#}"));
+        self.dirty.store(true, Ordering::SeqCst);
+        self.save_kick.notify_one();
+    }
+
+    async fn save_loop(self: Arc<Self>) {
+        loop {
+            tokio::select! {
+                _ = self.cancel.cancelled() => return,
+                _ = self.save_kick.notified() => {}
+            }
+            if !self.dirty.swap(false, Ordering::SeqCst) {
+                continue;
+            }
+            let saved = self.with(|s| s.saved.clone());
+            let store = self.store.clone();
+            match tokio::task::spawn_blocking(move || store.save_state(&saved)).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => self.events.log(format!("save: {e:#}")),
+                Err(e) => self.events.log(format!("save: {e}")),
+            }
+        }
+    }
+
+    /// Дописать несохранённое сразу (при выходе из приложения).
+    fn flush(&self) {
+        if self.dirty.swap(false, Ordering::SeqCst) {
+            let saved = self.with(|s| s.saved.clone());
+            if let Err(e) = self.store.save_state(&saved) {
+                self.events.log(format!("save: {e:#}"));
+            }
         }
     }
 
@@ -703,7 +746,7 @@ impl Node {
                 p.platform = platform.clone();
                 p.last_seen = now_unix();
                 if let Some(a) = addr.filter(|a| &a.id == id) {
-                    p.addr = Some(a);
+                    p.addr = Some(trim_addr(a));
                 }
                 true
             } else {
@@ -1354,6 +1397,7 @@ pub(crate) fn error_code(e: &anyhow::Error) -> String {
         "verify",
         "interrupted",
         "read",
+        "no_space",
     ];
     for cause in e.chain() {
         let s = cause.to_string();

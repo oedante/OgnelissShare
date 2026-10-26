@@ -1,13 +1,15 @@
 // «Сканировать код»: камера (телефоны, Mac) и поле для вставки ссылки.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../app/app_model.dart';
-import '../app/strings.dart';
 import '../core/native.dart';
 import '../platform/startup.dart';
+import '../l10n/l10n.dart';
 import 'join_screen.dart';
 import 'widgets.dart';
 
@@ -60,25 +62,28 @@ class _ScanScreenState extends State<ScanScreen> {
     _use(text);
   }
 
-  void _use(String uri) {
+  Future<void> _use(String uri) async {
     if (_busy) return;
     final model = AppScope.read(context);
+    final navigator = Navigator.of(context);
     setState(() {
       _busy = true;
       _error = null;
     });
     final JoinInfo info;
     try {
-      info = model.useInvite(uri);
+      info = await model.useInvite(uri);
     } on CoreError catch (e) {
+      if (!mounted) return;
       setState(() {
         _busy = false;
         _error = tr.error(e.code);
       });
       return;
     }
-    _camera?.stop();
-    Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => JoinScreen(info: info)));
+    if (!mounted) return;
+    unawaited(_camera?.stop());
+    unawaited(navigator.pushReplacement(MaterialPageRoute<void>(builder: (_) => JoinScreen(info: info))));
   }
 
   @override

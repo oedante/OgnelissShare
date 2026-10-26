@@ -9,11 +9,11 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../app/app_model.dart';
 import '../app/format.dart';
-import '../app/strings.dart';
 import '../app/theme.dart';
 import '../core/models.dart';
 import '../core/native.dart';
 import '../platform/startup.dart';
+import '../l10n/l10n.dart';
 import 'scan_screen.dart';
 import 'shell.dart';
 import 'widgets.dart';
@@ -34,6 +34,10 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
   Timer? _clock;
   AppModel? _model;
 
+  /// Код создаётся (номер попытки — чтобы поздний ответ не перебил новый).
+  bool _creating = true;
+  int _attempt = 0;
+
   @override
   void initState() {
     super.initState();
@@ -47,7 +51,7 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
     super.didChangeDependencies();
     if (_model == null) {
       _model = AppScope.read(context);
-      // Не во время построения: команда ядра обновляет состояние приложения.
+      // После первого кадра: _create меняет состояние экрана.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _create();
       });
@@ -57,20 +61,28 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
   @override
   void dispose() {
     _clock?.cancel();
-    final model = _model;
-    // После кадра: при закрытии экрана дерево виджетов заблокировано.
-    if (model != null) Future<void>.microtask(model.cancelInvite);
+    // Команда уходит в изолят ядра; ответ здесь не нужен.
+    _model?.cancelInvite();
     super.dispose();
   }
 
-  void _create() {
+  Future<void> _create() async {
+    final attempt = ++_attempt;
+    setState(() => _creating = true);
+    Invite? invite;
+    String? error;
     try {
-      final invite = _model!.createInvite(_mode);
-      _expiresAt = DateTime.now().add(Duration(seconds: invite?.expiresIn ?? 300));
+      invite = await _model!.createInvite(_mode);
     } on CoreError catch (e) {
-      showSnack(tr.error(e.code));
+      error = e.code;
     }
-    if (mounted) setState(() {});
+    if (!mounted || attempt != _attempt) return;
+    if (error != null) showSnack(tr.error(error));
+    final expiresAt = invite == null ? null : DateTime.now().add(Duration(seconds: invite.expiresIn));
+    setState(() {
+      _creating = false;
+      _expiresAt = expiresAt;
+    });
   }
 
   void _setMode(String mode) {
@@ -119,6 +131,8 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
                 const SizedBox(height: 20),
                 if (joined != null)
                   _JoinedCard(joined: joined, mode: invite!.mode, onNew: _create)
+                else if (_creating)
+                  const _Creating()
                 else if (invite == null || _left <= 0)
                   _ExpiredCard(onNew: _create)
                 else
@@ -139,6 +153,16 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
         ],
       ),
     );
+  }
+}
+
+/// Пока ядро готовит код (доли секунды) — место под него.
+class _Creating extends StatelessWidget {
+  const _Creating();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(height: 280, child: Center(child: CircularProgressIndicator()));
   }
 }
 
@@ -215,13 +239,13 @@ class _JoinedCard extends StatelessWidget {
     final Widget badge;
     switch (joined.state) {
       case 'pending':
-        text = tr.joinedPending(joined.name);
+        text = tr.joinedPending(tr.deviceName(joined.name));
         badge = const SizedBox(width: 40, height: 40, child: CircularProgressIndicator(strokeWidth: 3));
       case 'declined':
-        text = tr.joinedDeclined(joined.name);
+        text = tr.joinedDeclined(tr.deviceName(joined.name));
         badge = Icon(Icons.block_rounded, size: 48, color: theme.colorScheme.error);
       default:
-        text = mode == 'once' ? tr.joinedOnce(joined.name) : tr.joinedDone(joined.name);
+        text = mode == 'once' ? tr.joinedOnce(tr.deviceName(joined.name)) : tr.joinedDone(tr.deviceName(joined.name));
         badge = const Icon(Icons.check_circle_rounded, size: 56, color: Brand.ok);
     }
     final finished = joined.state != 'pending';

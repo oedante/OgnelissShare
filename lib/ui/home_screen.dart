@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../app/app_model.dart';
 import '../app/format.dart';
-import '../app/strings.dart';
 import '../core/models.dart';
 import '../core/native.dart';
 import '../platform/startup.dart';
+import '../l10n/l10n.dart';
 import 'add_device_screen.dart';
 import 'scan_screen.dart';
 import 'send_sheet.dart';
@@ -87,7 +87,7 @@ class HomeScreen extends StatelessWidget {
                   SectionHeader(
                     tr.transfers,
                     trailing: anyFinished
-                        ? TextButton(onPressed: model.clearTransfers, child: Text(tr.clear))
+                        ? TextButton(onPressed: () => model.clearTransfers(), child: Text(tr.clear))
                         : null,
                   ),
                   for (final t in snap.transfers)
@@ -118,7 +118,7 @@ class _MeCard extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
         leading: PeerAvatar(platform: me.platform, online: me.online),
-        title: Text(me.name.isEmpty ? '…' : me.name, style: theme.textTheme.titleMedium),
+        title: Text(tr.deviceName(me.name), style: theme.textTheme.titleMedium),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 2),
           child: Row(
@@ -165,7 +165,7 @@ Future<void> showRenameDialog(BuildContext context, String current) async {
   controller.dispose();
   if (name == null) return;
   try {
-    model.setName(name);
+    await model.setName(name);
   } on CoreError catch (e) {
     showSnack(tr.error(e.code));
   }
@@ -260,7 +260,7 @@ class _DeviceTile extends StatelessWidget {
       leading: PeerAvatar(platform: peer.platform, online: peer.online),
       title: Row(
         children: [
-          Flexible(child: Text(peer.name, overflow: TextOverflow.ellipsis)),
+          Flexible(child: Text(tr.deviceName(peer.name), overflow: TextOverflow.ellipsis)),
           const SizedBox(width: 8),
           CodeChip(peer.code),
           if (peer.isSession) ...[

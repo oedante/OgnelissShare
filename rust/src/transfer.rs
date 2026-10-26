@@ -128,6 +128,8 @@ pub struct Transfer {
     pub status: Status,
     pub text: Option<String>,
     pub saved_to: Option<PathBuf>,
+    /// saved_to — папка (несколько файлов или папка целиком).
+    pub saved_is_dir: bool,
     pub failed_files: usize,
     pub started: u64,
     pub finished: u64,
@@ -160,6 +162,7 @@ impl Transfer {
             status: Status::Preparing,
             text: None,
             saved_to: None,
+            saved_is_dir: false,
             failed_files: 0,
             started: now_unix(),
             finished: 0,
@@ -207,6 +210,7 @@ impl Transfer {
             "text": text,
             "text_truncated": truncated,
             "saved_to": self.saved_to.as_ref().map(|p| p.to_string_lossy().into_owned()),
+            "saved_is_dir": self.saved_is_dir,
             "failed_files": self.failed_files,
             "started": self.started,
             "finished": self.finished,
@@ -858,21 +862,30 @@ impl Node {
         }
 
         let dl = self.download_dir();
-        let stage = stage_dir(&self.stage_root(), &peer, &files);
         let prep = {
-            let stage = stage.clone();
+            let dl = dl.clone();
+            let data_dir = self.cfg.data_dir.clone();
             let files = files.clone();
-            tokio::task::spawn_blocking(move || prepare_stage(&stage, &files)).await
+            tokio::task::spawn_blocking(move || {
+                let stage = stage_dir(&stage_root(&dl, &data_dir), &peer, &files);
+                prepare_stage(&stage, &dl, &files).map(|offsets| (stage, offsets))
+            })
+            .await
         };
-        let offsets = match prep {
-            Ok(Ok(o)) => o,
+        let (stage, offsets) = match prep {
+            Ok(Ok(r)) => r,
             other => {
+                let reason = match &other {
+                    Ok(Err(e)) if error_code(e) == "no_space" => "no_space",
+                    _ => "storage",
+                };
                 if let Ok(Err(e)) = other {
                     self.events.log(format!("stage: {e:#}"));
                 }
-                let _ = write_msg(&mut send, &Msg::OfferDecline { reason: "storage".into() }).await;
+                let _ = write_msg(&mut send, &Msg::OfferDecline { reason: reason.into() }).await;
                 let _ = send.finish();
-                self.set_status(&id, Status::Failed("storage".into()));
+                self.set_status(&id, Status::Failed(reason.into()));
+                let _ = timeout(Duration::from_secs(5), send.stopped()).await;
                 return;
             }
         };
@@ -922,10 +935,15 @@ impl Node {
                 let saved =
                     tokio::task::spawn_blocking(move || finalize(&stage2, &dl2, &files2, &rels2)).await;
                 match saved {
-                    Ok(Ok(path)) => {
+                    Ok(Ok(place)) => {
                         let name = self.peer_name(&peer);
+                        let (path, is_dir) = match place {
+                            Some((p, d)) => (Some(p), d),
+                            None => (None, false),
+                        };
                         self.update(&id, |t| {
                             t.saved_to = path.clone();
+                            t.saved_is_dir = is_dir;
                             t.failed_files = failed_n;
                             t.done = t.total;
                         });
@@ -937,6 +955,7 @@ impl Node {
                             "type": "received", "transfer": id, "peer": peer.to_string(),
                             "name": name, "count": files.len(), "failed": failed_n,
                             "saved_to": path.map(|p| p.to_string_lossy().into_owned()),
+                            "saved_is_dir": is_dir,
                         }));
                     }
                     other => {
@@ -1116,7 +1135,7 @@ fn mtime_of(md: &fs::Metadata) -> u64 {
 
 /// Имя верхнего уровня без повторов: «IMG.jpg», «IMG (2).jpg».
 fn unique_top(used: &mut HashSet<String>, name: String) -> String {
-    let name = if name.trim().is_empty() { "Файлы".to_string() } else { name };
+    let name = if name.trim().is_empty() { "Files".to_string() } else { name };
     if used.insert(name.to_lowercase()) {
         return name;
     }
@@ -1306,6 +1325,17 @@ fn plan_offer(files: &[FileMeta], total: u64) -> Result<Vec<Vec<String>>, &'stat
     Ok(rels)
 }
 
+/// Куда принимать недокачанное: рядом с папкой загрузок (тогда перенос на
+/// место — простое переименование), а если там нельзя создать служебную
+/// папку — в данные приложения.
+pub(crate) fn stage_root(download_dir: &Path, data_dir: &Path) -> PathBuf {
+    let root = download_dir.join(STAGE_DIR);
+    if fs::create_dir_all(&root).is_ok() { root } else { data_dir.join("stage") }
+}
+
+/// Запас свободного места сверх размера передачи.
+const SPACE_MARGIN: u64 = 64 * 1024 * 1024;
+
 pub(crate) fn stage_dir(root: &Path, peer: &EndpointId, files: &[FileMeta]) -> PathBuf {
     let mut h = blake3::Hasher::new();
     h.update(b"ogneliss-share/stage/1");
@@ -1320,8 +1350,9 @@ pub(crate) fn stage_dir(root: &Path, peer: &EndpointId, files: &[FileMeta]) -> P
     root.join(&key.as_str()[..24])
 }
 
-/// Подготовить временную папку и посчитать, что уже есть.
-fn prepare_stage(stage: &Path, files: &[FileMeta]) -> Result<Vec<u64>> {
+/// Подготовить временную папку и посчитать, что уже есть. Места не хватит
+/// на остаток — отказ «no_space» до начала передачи.
+fn prepare_stage(stage: &Path, download_dir: &Path, files: &[FileMeta]) -> Result<Vec<u64>> {
     fs::create_dir_all(stage).with_context(|| format!("create {}", stage.display()))?;
     if let Some(root) = stage.parent() {
         // Не показывать недокачанное в галерее Android.
@@ -1351,6 +1382,13 @@ fn prepare_stage(stage: &Path, files: &[FileMeta]) -> Result<Vec<u64>> {
         let part = stage.join(format!("{i}.part"));
         let off = fs::metadata(&part).map(|m| m.len().min(f.size - 1)).unwrap_or(0);
         offsets.push(off);
+    }
+    let remaining: u64 = files.iter().zip(&offsets).map(|(f, o)| f.size - o).sum();
+    let _ = fs::create_dir_all(download_dir);
+    if let Ok(free) = fs4::available_space(stage).or_else(|_| fs4::available_space(download_dir))
+        && free < remaining.saturating_add(SPACE_MARGIN)
+    {
+        bail!("no_space");
     }
     Ok(offsets)
 }
@@ -1387,11 +1425,17 @@ fn set_mtime(path: &Path, mtime: u64) {
 }
 
 /// Перенести принятые файлы из временной папки на место.
-/// Возвращает, что показать пользователю: файл, папку или папку загрузок.
-fn finalize(stage: &Path, dl: &Path, files: &[FileMeta], rels: &[Vec<String>]) -> Result<Option<PathBuf>> {
+/// Возвращает, что показать пользователю (файл, папку или папку загрузок)
+/// и папка ли это.
+fn finalize(
+    stage: &Path,
+    dl: &Path,
+    files: &[FileMeta],
+    rels: &[Vec<String>],
+) -> Result<Option<(PathBuf, bool)>> {
     fs::create_dir_all(dl)?;
     let mut tops: HashMap<String, PathBuf> = HashMap::new();
-    let mut items: Vec<PathBuf> = Vec::new();
+    let mut items: Vec<(PathBuf, bool)> = Vec::new();
     for (i, rel) in rels.iter().enumerate() {
         let src = stage.join(format!("{i}.ok"));
         if !src.exists() {
@@ -1399,7 +1443,7 @@ fn finalize(stage: &Path, dl: &Path, files: &[FileMeta], rels: &[Vec<String>]) -
         }
         let dest = if rel.len() == 1 {
             let d = unique_path(dl, &rel[0]);
-            items.push(d.clone());
+            items.push((d.clone(), false));
             d
         } else {
             let top = match tops.get(&rel[0]) {
@@ -1408,7 +1452,7 @@ fn finalize(stage: &Path, dl: &Path, files: &[FileMeta], rels: &[Vec<String>]) -
                     let t = unique_path(dl, &rel[0]);
                     fs::create_dir_all(&t)?;
                     tops.insert(rel[0].clone(), t.clone());
-                    items.push(t.clone());
+                    items.push((t.clone(), true));
                     t
                 }
             };
@@ -1428,7 +1472,7 @@ fn finalize(stage: &Path, dl: &Path, files: &[FileMeta], rels: &[Vec<String>]) -
     Ok(match items.len() {
         0 => None,
         1 => Some(items.remove(0)),
-        _ => Some(dl.to_path_buf()),
+        _ => Some((dl.to_path_buf(), true)),
     })
 }
 
@@ -1494,6 +1538,18 @@ mod tests {
         assert_eq!(unique_top(&mut used, "IMG.jpg".into()), "IMG (3).jpg");
         assert_eq!(split_ext(".bashrc"), (".bashrc", ""));
         assert_eq!(split_ext("archive.tar.gz"), ("archive.tar", ".gz"));
+    }
+
+    #[test]
+    fn no_space_is_detected_before_transfer() {
+        let dir = std::env::temp_dir().join(format!("osh-space-{}", random_id()));
+        let stage = dir.join(STAGE_DIR).join("x");
+        let huge = [FileMeta { path: "big.bin".into(), size: u64::MAX / 2, mtime: 0 }];
+        let err = prepare_stage(&stage, &dir, &huge).unwrap_err();
+        assert_eq!(crate::node::error_code(&err), "no_space");
+        let small = [FileMeta { path: "a.txt".into(), size: 10, mtime: 0 }];
+        assert_eq!(prepare_stage(&stage, &dir, &small).unwrap(), vec![0]);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

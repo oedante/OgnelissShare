@@ -18,6 +18,10 @@ Pod::Spec.new do |s|
   s.dependency 'Flutter'
   s.platform = :ios, '13.0'
   s.swift_version = '5.0'
+  # Системные библиотеки, которые нужны ядру (rustc --print native-static-libs):
+  # сеть и DNS — Network, SystemConfiguration; TLS — Security.
+  s.frameworks = 'Network', 'SystemConfiguration', 'Security', 'CoreFoundation', 'Foundation'
+  s.libraries = 'iconv', 'objc'
 
   s.script_phase = {
     :name => 'Build Rust library',
