@@ -1,0 +1,5 @@
+1. Link two devices: “Add a device” (QR code) on one, “Scan code” on the other. Or “Send a link” by e-mail or in a messenger.
+2. Send files, photos and text both ways. Received files are in Files → On My iPhone → Ogneliss Share.
+3. Turn Wi-Fi off in the middle of a large transfer — it should resume once the connection is back.
+4. Try “One-time” exchange and “Files by link”.
+Problems: Settings → Log → “Copy”, and send feedback in TestFlight.

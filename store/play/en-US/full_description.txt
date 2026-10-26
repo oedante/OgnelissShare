@@ -1,0 +1,38 @@
+Ogneliss Share sends files between your devices directly: from your phone to your computer, from your computer to your tablet, from Android to iPhone. No cloud, no accounts and no size limits.
+
+HOW IT WORKS
+• Link your devices once: point the camera at a QR code, or send an invitation link by e-mail or in a messenger
+• Then tap a device in the list and choose what to send: files, a folder, photos and videos, text or a link
+• Linked devices accept files on their own — into Downloads → Ogneliss Share
+• Share from any app → Ogneliss Share → the device you need
+
+DIRECT AND FAST
+• On the same Wi-Fi network files go directly, at the speed of your network
+• Over the internet your devices find each other on their own — at home, at work, on the road
+• Connection dropped? The transfer resumes where it stopped
+• See which devices are online right now, and give them your own names
+
+PROTECTION
+• End-to-end encryption (QUIC, TLS 1.3): only the devices in the exchange can read the content
+• Every device has its own key, created on the device itself
+• When linking, both sides compare four digits on their screens
+• A stranger can neither connect nor send you a file — such connections are rejected right away
+• Every file is verified with a BLAKE3 hash
+• If a direct path is impossible, data goes through a relay that only sees the encrypted stream
+
+EXCHANGE WITH OTHER PEOPLE
+• One-time exchange: a temporary connection, and the receiver confirms every transfer
+• Files by link: send a link, and recipients download the files directly from your device while it is online, within 24 hours
+• Any link can be revoked
+
+ON ALL YOUR DEVICES
+Android, iPhone and iPad, Windows, macOS and Linux. Desktop versions are available at ogneliss.ru/share
+
+WHAT IT DOES NOT HAVE
+• Ads and analytics
+• Accounts and sign-up
+• Cloud storage: your files are not kept on anyone's servers
+• File size limits — as long as the receiver has enough space
+
+OPEN SOURCE
+The source code is open under the Apache 2.0 license, so everything said about protection can be verified — github.com/oedante/OgnelissShare

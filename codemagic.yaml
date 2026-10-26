@@ -1,0 +1,127 @@
+# Сборка для App Store без своего Mac — облако Codemagic (codemagic.io),
+# как у Ogneliss Mail. На Mac то же самое делает tool/release/testflight.sh.
+#
+# Один раз (подробно — docs/RELEASE.md, «TestFlight через Codemagic»):
+#  1. App Store Connect: приложение с идентификатором com.ogneliss.share
+#     (платформы iOS и macOS в одной записи).
+#  2. Ключ App Store Connect API с ролью App Manager — тот же, что для Mail:
+#     Codemagic → Teams → Integrations → App Store Connect → «Ogneliss ASC».
+#  3. Только для macOS: Codemagic → приложение → Environment variables →
+#     группа ogneliss_share → CERTIFICATE_PRIVATE_KEY (Secret) — закрытый ключ
+#     RSA для сертификатов Mac (создать: ssh-keygen -t rsa -b 2048 -m PEM
+#     -f mac_key -q -N "" и вставить содержимое файла mac_key целиком).
+#  4. Start new build → «iOS → TestFlight» или «macOS → TestFlight».
+#
+# Номер сборки — минуты с 01.01.2026 UTC (как у tool/release/build.py):
+# всегда больше прежнего, узнавать последний номер в TestFlight не нужно.
+# Шифрование: ITSAppUsesNonExemptEncryption = NO в Info.plist (tool/bootstrap.py),
+# вопрос об экспорте у каждой сборки не появляется — см. docs/RELEASE.md.
+
+definitions:
+  scripts:
+    - &rust
+      name: Rust
+      script: |
+        if ! command -v rustup >/dev/null 2>&1; then
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+        fi
+        . "$HOME/.cargo/env"
+        rustup update stable && rustup default stable
+        rustup target add aarch64-apple-ios aarch64-apple-darwin x86_64-apple-darwin
+        echo "PATH=$HOME/.cargo/bin:$PATH" >> "$CM_ENV"
+    - &platforms
+      name: Каталоги платформ
+      script: python3 tool/bootstrap.py
+    - &numbers
+      name: Версия и номер сборки
+      script: |
+        VERSION=$(sed -n 's/^version: *\([0-9][0-9.]*\).*/\1/p' pubspec.yaml)
+        BUILD=$(python3 -c 'import datetime as d; t = d.datetime.now(d.timezone.utc) - d.datetime(2026, 1, 1, tzinfo=d.timezone.utc); print(int(t.total_seconds() // 60))')
+        echo "Ogneliss Share $VERSION ($BUILD)"
+        echo "APP_VERSION=$VERSION" >> "$CM_ENV"
+        echo "APP_BUILD=$BUILD" >> "$CM_ENV"
+
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: Ogneliss ASC
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.ogneliss.share
+    triggering:
+      events: []            # запуск вручную из интерфейса Codemagic
+    scripts:
+      - *rust
+      - *platforms
+      - *numbers
+      - name: Профили подписи
+        script: xcode-project use-profiles
+      - name: Сборка IPA
+        script: |
+          flutter build ipa --release \
+            --build-name="$APP_VERSION" --build-number="$APP_BUILD" \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        # true — сразу отправлять на бета-проверку для внешних тестировщиков
+        # (сначала заполните «Информацию о тестировании» в TestFlight).
+        submit_to_testflight: false
+
+  macos-testflight:
+    name: macOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: Ogneliss ASC
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - ogneliss_share    # CERTIFICATE_PRIVATE_KEY
+    triggering:
+      events: []
+    scripts:
+      - *rust
+      - *platforms
+      - *numbers
+      - name: Подпись для Mac App Store
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files com.ogneliss.share \
+            --platform MAC_OS --type MAC_APP_STORE --create
+          app-store-connect certificates list --type MAC_INSTALLER_DISTRIBUTION --save || \
+            app-store-connect certificates create --type MAC_INSTALLER_DISTRIBUTION --save
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Сборка
+        script: |
+          flutter build macos --release \
+            --build-name="$APP_VERSION" --build-number="$APP_BUILD"
+      - name: Пакет для App Store
+        script: |
+          set -e
+          APP="build/macos/Build/Products/Release/Ogneliss Share.app"
+          mkdir -p build/macos/pkg
+          xcrun productbuild --component "$APP" /Applications/ unsigned.pkg
+          INSTALLER=$(keychain list-certificates \
+            | jq -r '[.[] | select(.common_name | contains("Mac Developer Installer")) | .common_name][0]')
+          xcrun productsign --sign "$INSTALLER" unsigned.pkg "build/macos/pkg/Ogneliss Share.pkg"
+          rm -f unsigned.pkg
+    artifacts:
+      - build/macos/pkg/*.pkg
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false

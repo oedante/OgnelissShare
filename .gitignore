@@ -37,3 +37,14 @@ android/local.properties
 **/ephemeral/
 **/Flutter/Generated.xcconfig
 **/Flutter/flutter_export_environment.sh
+
+# Сборки для выпуска (tool/release/build.py, testflight.sh) и служебное Python
+dist/
+__pycache__/
+
+# Ключи магазинов: в git — никогда (как получить — docs/RELEASE.md)
+*.p8
+*.p12
+*.mobileprovision
+*service-account*.json
+play-key*.json

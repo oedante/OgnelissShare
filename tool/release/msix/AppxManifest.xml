@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Манифест пакета MSIX для Microsoft Store. Значения в {{…}} подставляет
+  tool/release/build.py (сборка windows с ключом msix) из
+  store/windows/identity.json — там же сказано, откуда их взять в Partner
+  Center. Двух дефисов подряд в этом комментарии быть не должно (правило XML).
+
+  Программа — обычное приложение Windows (Win32) с полным доверием:
+  runFullTrust обязателен, в заявке Partner Center спросят, зачем он
+  (ответ — в store/README.md). Правила брандмауэра ставятся вместе с
+  пакетом: приём соединений в частных и доменных сетях, как ответ
+  «Разрешить в частных сетях» на вопрос Windows у обычной сборки.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop2="http://schemas.microsoft.com/appx/manifest/desktop/windows10/2"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap desktop2 rescap">
+
+  <Identity
+    Name="{{IDENTITY_NAME}}"
+    Publisher="{{PUBLISHER}}"
+    Version="{{VERSION}}"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Ogneliss Share</DisplayName>
+    <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+    <Resource Language="ru-RU" />
+  </Resources>
+
+  <Applications>
+    <Application Id="OgnelissShare" Executable="ogneliss_share.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Ogneliss Share"
+        Description="Direct encrypted file transfer between your devices"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <desktop2:Extension Category="windows.firewallRules">
+          <desktop2:FirewallRules Executable="ogneliss_share.exe">
+            <desktop2:Rule Direction="in" IPProtocol="UDP" Profile="domainAndPrivate" />
+            <desktop2:Rule Direction="in" IPProtocol="TCP" Profile="domainAndPrivate" />
+          </desktop2:FirewallRules>
+        </desktop2:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <Capability Name="internetClientServer" />
+    <Capability Name="privateNetworkClientServer" />
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

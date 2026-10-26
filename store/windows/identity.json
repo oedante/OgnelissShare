@@ -1,0 +1,7 @@
+{
+  "_comment": "Имя пакета и издатель для MSIX (Microsoft Store). Взять в Partner Center: приложение → Product management → Product identity (Package/Identity/Name, Package/Identity/Publisher, Package/Properties/PublisherDisplayName), затем убрать строку test. Сейчас пробные значения: пакет годится для проверки на своём компьютере, Partner Center его не примет.",
+  "test": true,
+  "name": "Ogneliss.Share",
+  "publisher": "CN=Ogneliss",
+  "publisher_display_name": "Ogneliss"
+}

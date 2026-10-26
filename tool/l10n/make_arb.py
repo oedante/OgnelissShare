@@ -97,8 +97,8 @@ T = {
     'textHint': ('Text or link', 'Текст или ссылка', 'Подсказка поля', {}),
     'forget': ('Forget device', 'Забыть устройство', 'Пункт меню', {}),
     'endSession': ('End exchange', 'Завершить обмен', 'Пункт меню', {}),
-    'forgetConfirm': ('“{name}” and this device will no longer be able to exchange files. You will need a QR code to link them again.',
-                      '«{name}» и это устройство больше не смогут обмениваться файлами. Чтобы снова связаться, понадобится QR-код.',
+    'forgetConfirm': ('“{name}” and this device will no longer be able to exchange files. To link them again, you will need a QR code or an invitation link.',
+                      '«{name}» и это устройство больше не смогут обмениваться файлами. Чтобы снова связаться, понадобится QR-код или ссылка-приглашение.',
                       'Подтверждение', {'name': S}),
 
     # Добавить устройство
@@ -216,11 +216,15 @@ T = {
     'howItWorks': ('How it works', 'Как это работает', 'Раздел', {}),
     'howItWorksBody': (
         'There are no accounts. Every device has its own key created on the device itself; devices recognize each other by these keys.\n\n'
-        'Devices can only be linked with a QR code shown on screen: a stranger can neither connect nor send a file — such connections are rejected right away.\n\n'
+        'Devices can only be linked with a QR code shown on screen or with an invitation link you sent yourself: '
+        'a link works once, and the inviting device confirms the connection. '
+        'A stranger can neither connect nor send a file — such connections are rejected right away.\n\n'
         'Files go directly between devices, encrypted (QUIC, TLS 1.3). If a direct path is impossible, data goes through a relay, which only sees the encrypted stream.\n\n'
         'After a connection drop the transfer resumes where it stopped, and every file is verified with a BLAKE3 hash.',
         'Учётных записей нет. У каждого устройства свой ключ, созданный на нём самом; по ключу устройства и узнают друг друга.\n\n'
-        'Связать устройства можно только QR-кодом, который показан на экране: посторонний не может ни подключиться, ни прислать файл — такие соединения отклоняются сразу.\n\n'
+        'Связать устройства можно только QR-кодом с экрана или ссылкой-приглашением, которую вы отправили сами: '
+        'ссылка срабатывает один раз, а подключение подтверждается на пригласившем устройстве. '
+        'Посторонний не может ни подключиться, ни прислать файл — такие соединения отклоняются сразу.\n\n'
         'Файлы идут напрямую между устройствами и зашифрованы (QUIC, TLS 1.3). Если прямой путь невозможен, данные проходят через ретранслятор — он видит только зашифрованный поток.\n\n'
         'После обрыва связи передача продолжается с места остановки, каждый файл проверяется по хешу BLAKE3.',
         'Пояснение', {}),
