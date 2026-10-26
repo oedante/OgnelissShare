@@ -1,6 +1,8 @@
-// «Сканировать код»: камера (телефоны, Mac) и поле для вставки ссылки.
+// «Сканировать код»: камера (телефоны, Mac) и поле для вставки ссылки —
+// из QR-кода или из сообщения (почта, мессенджер), можно вместе с текстом.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +17,9 @@ import 'widgets.dart';
 
 const _scheme = 'ogshare://';
 
+/// Похоже на ссылку Ogneliss Share (код или приглашение из сообщения).
+bool looksLikeLink(String text) => text.contains(_scheme) || text.contains('ogneliss.ru/share/join');
+
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
 
@@ -27,6 +32,7 @@ class _ScanScreenState extends State<ScanScreen> {
   MobileScannerController? _camera;
   bool _busy = false;
   String? _error;
+  String? _note;
 
   @override
   void initState() {
@@ -34,6 +40,21 @@ class _ScanScreenState extends State<ScanScreen> {
     if (canScan) {
       _camera = MobileScannerController(formats: const [BarcodeFormat.qrCode]);
     }
+    // Скопировали ссылку из письма или мессенджера — сразу подставим её.
+    // На iOS не читаем: система спрашивала бы разрешение на вставку.
+    if (!Platform.isIOS) _fromClipboard();
+  }
+
+  Future<void> _fromClipboard() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text?.trim() ?? '';
+      if (!mounted || text.isEmpty || !looksLikeLink(text) || _link.text.isNotEmpty) return;
+      setState(() {
+        _link.text = text;
+        _note = tr.pastedFromClipboard;
+      });
+    } catch (_) {}
   }
 
   @override
@@ -146,9 +167,12 @@ class _ScanScreenState extends State<ScanScreen> {
                 TextField(
                   controller: _link,
                   enabled: !_busy,
+                  minLines: 1,
+                  maxLines: 3,
                   decoration: InputDecoration(
                     labelText: tr.pasteLink,
                     hintText: tr.linkFieldHint,
+                    helperText: _note,
                     errorText: _error,
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(

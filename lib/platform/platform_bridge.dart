@@ -1,5 +1,6 @@
-// Мост к коду Android (MainActivity.kt): имя устройства, папка «Загрузки»
-// и «Поделиться» из других приложений. На остальных платформах — пусто.
+// Мост к коду Android (MainActivity.kt): имя устройства, папка «Загрузки»,
+// «Поделиться» из других приложений и в них, открытые ссылки-приглашения.
+// На остальных платформах — пусто.
 
 import 'dart:io';
 
@@ -35,9 +36,14 @@ class PlatformBridge {
   /// Общая папка «Загрузки» (/storage/emulated/0/Download).
   static Future<String?> publicDownloads() => _invoke<String>('publicDownloads');
 
-  /// Подписаться на «Поделиться»: [onPreparing] — файлы копируются,
-  /// [onShared] — можно забрать их через [takeShared].
-  static void listen({required void Function(int count) onPreparing, required void Function() onShared}) {
+  /// Подписаться на «Поделиться» и ссылки: [onPreparing] — файлы копируются,
+  /// [onShared] — можно забрать их через [takeShared], [onLink] — открыли
+  /// ссылку-приглашение, забрать через [takeLink].
+  static void listen({
+    required void Function(int count) onPreparing,
+    required void Function() onShared,
+    required void Function() onLink,
+  }) {
     if (!Platform.isAndroid) return;
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
@@ -46,9 +52,26 @@ class PlatformBridge {
           onPreparing(n is int ? n : 0);
         case 'shared':
           onShared();
+        case 'link':
+          onLink();
       }
       return null;
     });
+  }
+
+  /// Ссылка-приглашение, которой открыли приложение (и при запуске тоже).
+  static Future<String?> takeLink() => _invoke<String>('takeLink');
+
+  /// Системное «Поделиться» с текстом (почта, мессенджеры). false — не вышло
+  /// или не Android: тогда интерфейс предлагает скопировать текст.
+  static Future<bool> shareText(String subject, String text) async {
+    if (!Platform.isAndroid) return false;
+    try {
+      final ok = await _channel.invokeMethod<bool>('shareText', {'subject': subject, 'text': text});
+      return ok ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Забрать то, что пришло через «Поделиться» (и при запуске приложения тоже).

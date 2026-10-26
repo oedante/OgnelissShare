@@ -68,6 +68,8 @@ class Peer {
     required this.id,
     required this.code,
     required this.name,
+    this.ownName = '',
+    this.renamed = false,
     required this.platform,
     required this.kind,
     required this.online,
@@ -79,6 +81,8 @@ class Peer {
         id: _str(j['id']),
         code: _str(j['code']),
         name: _str(j['name']),
+        ownName: _str(j['own_name']),
+        renamed: _bool(j['renamed']),
         platform: _str(j['platform']),
         kind: _str(j['kind']),
         online: _bool(j['online']),
@@ -88,7 +92,15 @@ class Peer {
 
   final String id;
   final String code;
+
+  /// Имя для показа: своё, если его дали, иначе то, что сообщает устройство.
   final String name;
+
+  /// Как устройство называет себя само.
+  final String ownName;
+
+  /// Владелец дал устройству своё имя (видно только здесь).
+  final bool renamed;
   final String platform;
 
   /// paired — постоянная связь; session — разовый обмен.
@@ -146,6 +158,7 @@ class Request {
     required this.count,
     required this.total,
     required this.names,
+    this.viaLink = false,
   });
 
   factory Request.fromJson(Map<String, dynamic> j) => Request(
@@ -158,6 +171,7 @@ class Request {
         count: _int(j['count']),
         total: _int(j['total']),
         names: _strings(j['names']),
+        viaLink: _bool(j['via_link']),
       );
 
   final String id;
@@ -173,6 +187,51 @@ class Request {
   final int count;
   final int total;
   final List<String> names;
+
+  /// Подключаются по ссылке из сообщения, а не по QR-коду рядом.
+  final bool viaLink;
+}
+
+/// Ссылка для почты или мессенджера: приглашение или файлы.
+class LinkItem {
+  const LinkItem({
+    required this.id,
+    required this.mode,
+    required this.url,
+    required this.created,
+    required this.expires,
+    required this.uses,
+    required this.count,
+    required this.names,
+  });
+
+  factory LinkItem.fromJson(Map<String, dynamic> j) => LinkItem(
+        id: _str(j['id']),
+        mode: _str(j['mode']),
+        url: _str(j['url']),
+        created: _int(j['created']),
+        expires: _int(j['expires']),
+        uses: _int(j['uses']),
+        count: _int(j['count']),
+        names: _strings(j['names']),
+      );
+
+  final String id;
+
+  /// pair — «Моё устройство», once — разовый обмен, files — файлы по ссылке.
+  final String mode;
+  final String url;
+  final int created;
+
+  /// До какого момента действует (секунды Unix).
+  final int expires;
+
+  /// Сколько раз по ссылке получили файлы.
+  final int uses;
+  final int count;
+  final List<String> names;
+
+  bool get isFiles => mode == 'files';
 }
 
 /// Передача файлов или текста.
@@ -274,6 +333,7 @@ class Snapshot {
     required this.invite,
     required this.requests,
     required this.transfers,
+    this.links = const [],
   });
 
   factory Snapshot.fromJson(Map<String, dynamic> j) => Snapshot(
@@ -282,6 +342,7 @@ class Snapshot {
         invite: j['invite'] is Map ? Invite.fromJson(_map(j['invite'])) : null,
         requests: [for (final r in _maps(j['requests'])) Request.fromJson(r)],
         transfers: [for (final t in _maps(j['transfers'])) TransferItem.fromJson(t)],
+        links: [for (final l in _maps(j['links'])) LinkItem.fromJson(l)],
       );
 
   static const empty = Snapshot(me: Me.empty, peers: [], invite: null, requests: [], transfers: []);
@@ -293,6 +354,9 @@ class Snapshot {
 
   /// Сначала новые.
   final List<TransferItem> transfers;
+
+  /// Действующие ссылки, сначала новые.
+  final List<LinkItem> links;
 
   Peer? peer(String id) {
     for (final p in peers) {

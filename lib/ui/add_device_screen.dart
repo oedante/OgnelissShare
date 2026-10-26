@@ -4,7 +4,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../app/app_model.dart';
@@ -15,6 +14,7 @@ import '../core/native.dart';
 import '../platform/startup.dart';
 import '../l10n/l10n.dart';
 import 'scan_screen.dart';
+import 'share_link.dart';
 import 'shell.dart';
 import 'widgets.dart';
 
@@ -204,18 +204,18 @@ class _QrCard extends StatelessWidget {
           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 16),
-        TextButton.icon(
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: invite.uri));
-            showSnack(tr.copied, duration: const Duration(seconds: 2));
-          },
-          icon: const Icon(Icons.copy_rounded),
-          label: Text(tr.copyLink),
+        // Устройство далеко или без камеры — ссылка по почте или в мессенджере
+        // (отдельная, на сутки; QR-код при этом остаётся в силе).
+        FilledButton.tonalIcon(
+          onPressed: () => createAndShareLink(context, invite.mode),
+          icon: const Icon(Icons.send_rounded),
+          label: Text(tr.sendLink),
         ),
+        const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
-            tr.linkHint,
+            tr.sendLinkHint,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),

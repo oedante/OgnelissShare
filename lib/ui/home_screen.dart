@@ -6,12 +6,14 @@ import '../app/app_model.dart';
 import '../app/format.dart';
 import '../core/models.dart';
 import '../core/native.dart';
+import '../platform/files.dart';
 import '../platform/startup.dart';
 import '../l10n/l10n.dart';
 import 'add_device_screen.dart';
 import 'scan_screen.dart';
 import 'send_sheet.dart';
 import 'settings_screen.dart';
+import 'share_link.dart';
 import 'shell.dart';
 import 'transfer_tile.dart';
 import 'widgets.dart';
@@ -24,6 +26,20 @@ class HomeScreen extends StatelessWidget {
 
   static void openScan(BuildContext context) =>
       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ScanScreen()));
+
+  /// Файлы по ссылке: выбрать файлы и отправить ссылку на них.
+  static Future<void> filesByLink(BuildContext context) async {
+    final List<String> paths;
+    try {
+      paths = await Files.pickFiles();
+    } catch (_) {
+      showSnack(tr.error('read'));
+      return;
+    }
+    if (paths.isEmpty || !context.mounted) return;
+    // На телефонах выбранное — временные копии: ядро заберёт их к ссылке.
+    await createAndShareLink(context, 'files', paths: paths, takeFiles: isMobile);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +64,11 @@ class HomeScreen extends StatelessWidget {
             tooltip: canScan ? tr.scanCode : tr.pasteLink,
             icon: Icon(canScan ? Icons.qr_code_scanner_rounded : Icons.link_rounded),
             onPressed: () => openScan(context),
+          ),
+          IconButton(
+            tooltip: tr.filesByLink,
+            icon: const Icon(Icons.add_link_rounded),
+            onPressed: () => filesByLink(context),
           ),
           IconButton(
             tooltip: tr.settings,
@@ -82,6 +103,20 @@ class HomeScreen extends StatelessWidget {
                 if (sessions.isNotEmpty) ...[
                   SectionHeader(tr.oneTimePeers),
                   _DeviceGroup(peers: sessions),
+                ],
+                if (snap.links.isNotEmpty) ...[
+                  SectionHeader(tr.links),
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < snap.links.length; i++) ...[
+                          if (i > 0) const Divider(height: 1, indent: 72),
+                          _LinkTile(key: ValueKey(snap.links[i].id), link: snap.links[i]),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
                 if (snap.transfers.isNotEmpty) ...[
                   SectionHeader(
@@ -211,6 +246,12 @@ class _EmptyDevices extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => HomeScreen.filesByLink(context),
+                icon: const Icon(Icons.add_link_rounded),
+                label: Text(tr.filesByLink),
+              ),
             ],
           ),
         ),
@@ -279,6 +320,70 @@ class _DeviceTile extends StatelessWidget {
         onPressed: () => showSendSheet(context, peer),
       ),
       onTap: () => showSendSheet(context, peer),
+    );
+  }
+}
+
+/// Действующая ссылка: что, до какого времени, отправить ещё раз, отозвать.
+class _LinkTile extends StatelessWidget {
+  const _LinkTile({super.key, required this.link});
+
+  final LinkItem link;
+
+  Future<void> _revoke(BuildContext context) async {
+    final model = AppScope.read(context);
+    try {
+      await model.revokeLink(link.id);
+      showSnack(tr.linkRevoked, duration: const Duration(seconds: 2));
+    } on CoreError catch (e) {
+      showSnack(tr.error(e.code));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final IconData icon = switch (link.mode) {
+      'pair' => Icons.devices_rounded,
+      'files' => Icons.insert_drive_file_outlined,
+      _ => Icons.swap_horiz_rounded,
+    };
+    final String title = switch (link.mode) {
+      'pair' => tr.linkPair,
+      'files' => tr.linkFiles(formatNames(link.names, link.count)),
+      _ => tr.linkOnce,
+    };
+    final details = [
+      tr.linkUntil(formatUntil(link.expires)),
+      if (link.isFiles) tr.linkUses(link.uses),
+    ];
+    return ListTile(
+      contentPadding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
+      leading: CircleAvatar(
+        backgroundColor: theme.colorScheme.secondaryContainer,
+        foregroundColor: theme.colorScheme.onSecondaryContainer,
+        child: Icon(icon),
+      ),
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        details.join(' · '),
+        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: tr.shareAgain,
+            icon: const Icon(Icons.send_rounded),
+            onPressed: () => shareLink(context, link),
+          ),
+          IconButton(
+            tooltip: tr.revoke,
+            icon: const Icon(Icons.link_off_rounded),
+            onPressed: () => _revoke(context),
+          ),
+        ],
+      ),
     );
   }
 }

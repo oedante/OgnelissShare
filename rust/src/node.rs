@@ -1028,7 +1028,7 @@ impl Node {
     /// (телефоны): перенести их в папку ссылки, чтобы дожили до её конца.
     pub fn create_link(&self, mode: PairMode, paths: Vec<PathBuf>, take_files: bool) -> Result<Value> {
         if self.with(|s| s.saved.invites.len()) >= MAX_LINKS {
-            bail!("busy");
+            bail!("too_many");
         }
         let id = random_id();
         let (files, owned_dir) = if mode == PairMode::Files {
@@ -1700,6 +1700,7 @@ pub(crate) fn error_code(e: &anyhow::Error) -> String {
         "interrupted",
         "read",
         "no_space",
+        "too_many",
     ];
     for cause in e.chain() {
         let s = cause.to_string();

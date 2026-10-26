@@ -368,8 +368,12 @@
   "@copyLink": {
     "description": "Кнопка"
   },
-  "linkHint": "No camera? Copy the link and paste it on the other device: “Scan code” → “Paste link”.",
-  "@linkHint": {
+  "sendLink": "Send a link",
+  "@sendLink": {
+    "description": "Кнопка: пригласить по почте или в мессенджере"
+  },
+  "sendLinkHint": "No camera, or the device is far away? Send a link by e-mail or in a messenger. It works once and is valid for 24 hours.",
+  "@sendLinkHint": {
     "description": "Подсказка"
   },
   "joinedPending": "“{name}” is connecting — confirm on this device.",
@@ -429,6 +433,10 @@
   "@pairRequestBody": {
     "description": "Вопрос"
   },
+  "pairRequestLinkBody": "Connecting via your link. If you can, compare the four digits with the person you sent it to. Do not recognise the device — tap “Decline”.",
+  "@pairRequestLinkBody": {
+    "description": "Вопрос"
+  },
   "offerTitle": "“{name}” wants to send files",
   "@offerTitle": {
     "description": "Вопрос",
@@ -446,9 +454,13 @@
   "@scanHint": {
     "description": "Подсказка"
   },
-  "linkFieldHint": "A link like ogshare://…",
+  "linkFieldHint": "A link or a whole message with one",
   "@linkFieldHint": {
     "description": "Подсказка поля"
+  },
+  "pastedFromClipboard": "Link from the clipboard pasted",
+  "@pastedFromClipboard": {
+    "description": "Подсказка"
   },
   "cameraUnavailable": "The camera is unavailable. Paste the link copied on the other device.",
   "@cameraUnavailable": {
@@ -483,6 +495,24 @@
   "joinDoneOnce": "Connected to “{name}”. You can exchange files now.",
   "@joinDoneOnce": {
     "description": "Итог",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinDoneFiles": "Connected to “{name}”. The files are on their way — confirm receiving them.",
+  "@joinDoneFiles": {
+    "description": "Итог",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinWaitingLink": "Waiting for “{name}” to confirm. The sender may be away from the screen — give it a few minutes.",
+  "@joinWaitingLink": {
+    "description": "Состояние",
     "placeholders": {
       "name": {
         "type": "String"
@@ -539,6 +569,154 @@
   "shareNoDevices": "Add a device first — show a code or scan one.",
   "@shareNoDevices": {
     "description": "Подсказка"
+  },
+  "joinedViaLink": "“{name}” connected via your link",
+  "@joinedViaLink": {
+    "description": "Уведомление",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "filesByLink": "Files by link",
+  "@filesByLink": {
+    "description": "Кнопка и заголовок"
+  },
+  "filesByLinkHint": "Recipients download the files directly from this device while it is online, within 24 hours.",
+  "@filesByLinkHint": {
+    "description": "Подсказка"
+  },
+  "links": "Links",
+  "@links": {
+    "description": "Раздел главного экрана"
+  },
+  "linkPair": "Invitation · my device",
+  "@linkPair": {
+    "description": "Ссылка в списке"
+  },
+  "linkOnce": "Invitation · one-time exchange",
+  "@linkOnce": {
+    "description": "Ссылка в списке"
+  },
+  "linkFiles": "Files: {what}",
+  "@linkFiles": {
+    "description": "Ссылка в списке",
+    "placeholders": {
+      "what": {
+        "type": "String"
+      }
+    }
+  },
+  "linkUntil": "until {time}",
+  "@linkUntil": {
+    "description": "Срок ссылки",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "linkUses": "{count, plural, =0{not opened yet} =1{received once} other{received {count} times}}",
+  "@linkUses": {
+    "description": "Сколько раз по ссылке получили файлы",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "revoke": "Revoke",
+  "@revoke": {
+    "description": "Кнопка"
+  },
+  "linkRevoked": "Link revoked",
+  "@linkRevoked": {
+    "description": "Уведомление"
+  },
+  "shareAgain": "Send again",
+  "@shareAgain": {
+    "description": "Кнопка"
+  },
+  "linkSheetTitle": "Send the link",
+  "@linkSheetTitle": {
+    "description": "Заголовок"
+  },
+  "copyMessage": "Copy message",
+  "@copyMessage": {
+    "description": "Кнопка"
+  },
+  "sendByEmail": "Send by e-mail",
+  "@sendByEmail": {
+    "description": "Кнопка"
+  },
+  "msgSubject": "Ogneliss Share",
+  "@msgSubject": {
+    "description": "Тема письма с приглашением"
+  },
+  "msgPair": "Connect to my device “{name}” in Ogneliss Share — the link is valid until {time}:\n{url}",
+  "@msgPair": {
+    "description": "Текст приглашения",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "msgOnce": "Let’s exchange files in Ogneliss Share — the link is valid until {time}:\n{url}",
+  "@msgOnce": {
+    "description": "Текст приглашения",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "msgFiles": "Files for you in Ogneliss Share: {what}. The link is valid until {time}:\n{url}",
+  "@msgFiles": {
+    "description": "Текст ссылки с файлами",
+    "placeholders": {
+      "what": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "msgHelp": "Open it on a phone or computer with Ogneliss Share (free: https://ogneliss.ru/share/). If it does not open, copy it and paste it in the app: “Scan code” → “Paste link”.",
+  "@msgHelp": {
+    "description": "Подсказка в сообщении"
+  },
+  "peerNameHint": "Only you see this name. Leave it empty to use “{name}”.",
+  "@peerNameHint": {
+    "description": "Подсказка",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "callsItself": "calls itself “{name}”",
+  "@callsItself": {
+    "description": "Подпись под своим именем устройства",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "downloadsFolder": "Folder for received files",
   "@downloadsFolder": {
@@ -621,8 +799,12 @@
   "@errorUnreachable": {
     "description": "Ошибка"
   },
-  "errorExpired": "The code has expired or was already used. Ask for a new one.",
+  "errorExpired": "The code or link has expired or was already used. Ask for a new one.",
   "@errorExpired": {
+    "description": "Ошибка"
+  },
+  "errorTooMany": "Too many active links. Revoke the ones you do not need.",
+  "@errorTooMany": {
     "description": "Ошибка"
   },
   "errorDeclined": "Declined on the other device.",

@@ -27,25 +27,33 @@ import java.util.UUID
  *    телефоны не принимают mDNS и не видят свои устройства в Wi-Fi без интернета;
  *  - принимается «Поделиться» из других приложений: файлы копируются в
  *    личный кэш под безопасными именами, и интерфейс предлагает выбрать,
- *    на какое устройство их отправить.
+ *    на какое устройство их отправить;
+ *  - открываются ссылки-приглашения (ogshare://pair?… и
+ *    https://ogneliss.ru/share/join/#…) — их разбирает ядро;
+ *  - текст ссылки отправляется через системное «Поделиться».
  */
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
     private var multicastLock: WifiManager.MulticastLock? = null
     private var pendingShare: HashMap<String, Any?>? = null
+    private var pendingLink: String? = null
 
     private external fun nativeInit(context: Context)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         initCore()
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) handleShare(intent)
+        if (savedInstanceState == null) {
+            handleShare(intent)
+            handleLink(intent)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleShare(intent)
+        handleLink(intent)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -57,6 +65,11 @@ class MainActivity : FlutterActivity() {
                     result.success(pendingShare)
                     pendingShare = null
                 }
+                "takeLink" -> {
+                    result.success(pendingLink)
+                    pendingLink = null
+                }
+                "shareText" -> result.success(shareText(call.argument<String>("subject"), call.argument<String>("text")))
                 "deviceName" -> result.success(deviceName())
                 "publicDownloads" -> result.success(publicDownloads())
                 else -> result.notImplemented()
@@ -131,6 +144,35 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             null
         }
+
+    // ------------------------------------------------------------ ссылки
+
+    /** Открыли ссылку-приглашение: отдать её интерфейсу (сам адрес разберёт ядро). */
+    private fun handleLink(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_VIEW) return
+        val link = intent.dataString ?: return
+        // Принято — после поворота экрана та же ссылка повторно не придёт.
+        intent.action = Intent.ACTION_MAIN
+        pendingLink = link
+        channel?.invokeMethod("link", null)
+    }
+
+    /** Системное «Поделиться» с текстом: почта, мессенджеры. */
+    private fun shareText(subject: String?, text: String?): Boolean {
+        if (text.isNullOrEmpty()) return false
+        return try {
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, text)
+                if (!subject.isNullOrEmpty()) putExtra(Intent.EXTRA_SUBJECT, subject)
+            }
+            startActivity(Intent.createChooser(send, null))
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "share text: $e")
+            false
+        }
+    }
 
     // ------------------------------------------------------------ «Поделиться»
 

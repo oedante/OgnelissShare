@@ -55,6 +55,7 @@ extension AppTexts on AppLocalizations {
         'bad_path' => errorBadPath,
         'protocol' => errorProtocol,
         'not_found' => errorNotFound,
+        'too_many' => errorTooMany,
         _ => errorGeneric,
       };
 

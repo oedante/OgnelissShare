@@ -36,6 +36,26 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Ссылки разбирает само приложение — не превращать их в маршруты Flutter. -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
+            <!-- Ссылки-приглашения: код ogshare://pair?… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ogshare" android:host="pair" />
+            </intent-filter>
+            <!-- …и https://ogneliss.ru/share/join/#… из писем и мессенджеров. Открываются
+                 сразу в приложении, когда на сайте лежит .well-known/assetlinks.json
+                 с отпечатком ключа подписи (см. docs/RELEASE.md); иначе — страница сайта. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="ogneliss.ru" android:pathPrefix="/share/join" />
+            </intent-filter>
             <!-- «Поделиться» из любого приложения: файлы, фото, текст, ссылки. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />

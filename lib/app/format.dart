@@ -76,6 +76,12 @@ String formatNames(List<String> names, int count) {
   return '$shown · ${tr.files(count)}';
 }
 
+/// «27 октября 23:15» — до какого момента действует ссылка.
+String formatUntil(int unixSeconds) {
+  final at = DateTime.fromMillisecondsSinceEpoch(unixSeconds * 1000);
+  return DateFormat.MMMMd(tr.localeName).add_Hm().format(at);
+}
+
 /// М:сс для обратного отсчёта.
 String formatClock(int seconds) {
   final s = seconds < 0 ? 0 : seconds;

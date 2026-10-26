@@ -97,13 +97,28 @@ class AppModel extends ChangeNotifier {
     final r = await core.call('use_invite', {'uri': uri.trim()});
     final m = r is Map ? Map<String, dynamic>.from(r) : <String, dynamic>{};
     return JoinInfo(
+      uri: uri.trim(),
       peer: (m['peer'] as String?) ?? '',
       name: (m['name'] as String?) ?? '',
       platform: (m['platform'] as String?) ?? '',
       mode: (m['mode'] as String?) ?? 'pair',
       code: (m['code'] as String?) ?? '',
+      remote: m['remote'] == true,
     );
   }
+
+  /// Ссылка для почты или мессенджера: mode — pair, once или files.
+  /// [takeFiles] — файлы это временные копии (телефоны): ядро заберёт их
+  /// в папку ссылки, чтобы они дожили до её конца.
+  Future<LinkItem> createLink(String mode, {List<String> paths = const [], bool takeFiles = false}) async {
+    final r = await core.call('create_link', {'mode': mode, 'paths': paths, 'take_files': takeFiles});
+    return LinkItem.fromJson(r is Map ? Map<String, dynamic>.from(r) : <String, dynamic>{});
+  }
+
+  Future<void> revokeLink(String id) => core.call('revoke_link', {'id': id});
+
+  /// Своё имя для связанного устройства; пустое — имя, которое оно сообщает.
+  Future<void> renamePeer(String peer, String name) => core.call('rename_peer', {'peer': peer, 'name': name});
 
   Future<void> respondPair(String id, bool accept) =>
       _quiet(core.call('respond_pair', {'id': id, 'accept': accept}));
@@ -150,22 +165,32 @@ class AppModel extends ChangeNotifier {
 /// Что известно о другом устройстве сразу после сканирования его кода.
 class JoinInfo {
   const JoinInfo({
+    required this.uri,
     required this.peer,
     required this.name,
     required this.platform,
     required this.mode,
     required this.code,
+    this.remote = false,
   });
 
+  /// Ссылка, по которой подключаемся (для «Повторить»).
+  final String uri;
   final String peer;
   final String name;
   final String platform;
+
+  /// pair, once или files.
   final String mode;
 
   /// Четыре цифры, которые должны совпасть на обоих экранах.
   final String code;
 
-  bool get once => mode == 'once';
+  /// Ссылка из сообщения, а не QR-код рядом.
+  final bool remote;
+
+  bool get once => mode == 'once' || mode == 'files';
+  bool get files => mode == 'files';
 }
 
 /// Доступ к [AppModel] из любого виджета: `AppScope.of(context)`.

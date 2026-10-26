@@ -12,6 +12,7 @@ import '../platform/files.dart';
 import '../platform/platform_bridge.dart';
 import '../platform/startup.dart';
 import '../l10n/l10n.dart';
+import 'share_link.dart';
 import 'shell.dart';
 import 'widgets.dart';
 
@@ -49,7 +50,14 @@ class _SendSheet extends StatelessWidget {
                 children: [
                   CodeChip(current.code),
                   const SizedBox(width: 8),
-                  Flexible(child: Text(current.online ? tr.online : tr.offline)),
+                  Flexible(
+                    child: Text(
+                      current.renamed && current.ownName.isNotEmpty
+                          ? '${current.online ? tr.online : tr.offline} · ${tr.callsItself(current.ownName)}'
+                          : (current.online ? tr.online : tr.offline),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -82,6 +90,12 @@ class _SendSheet extends StatelessWidget {
               onTap: () => _composeText(context, model, current),
             ),
             const Divider(),
+            if (!current.isSession)
+              _Option(
+                icon: Icons.edit_outlined,
+                label: tr.rename,
+                onTap: () => _rename(context, model, current),
+              ),
             _Option(
               icon: current.isSession ? Icons.link_off_rounded : Icons.delete_outline_rounded,
               label: current.isSession ? tr.endSession : tr.forget,
@@ -155,6 +169,44 @@ Future<void> _composeText(BuildContext context, AppModel model, Peer peer) async
   if (text == null || text.trim().isEmpty) return;
   try {
     await model.sendText(peer.id, text);
+  } on CoreError catch (e) {
+    showSnack(tr.error(e.code));
+  }
+}
+
+/// Своё имя для связанного устройства (видно только здесь).
+Future<void> _rename(BuildContext context, AppModel model, Peer peer) async {
+  Navigator.of(context).pop();
+  final ctx = navigatorKey.currentContext;
+  if (ctx == null) return;
+  final own = peer.ownName.isNotEmpty ? peer.ownName : peer.name;
+  final controller = TextEditingController(text: peer.renamed ? peer.name : '');
+  final name = await showDialog<String>(
+    context: ctx,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(tr.deviceNameTitle),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        maxLength: 40,
+        decoration: InputDecoration(
+          hintText: tr.deviceName(own),
+          helperText: tr.peerNameHint(tr.deviceName(own)),
+          helperMaxLines: 3,
+          border: const OutlineInputBorder(),
+        ),
+        onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(tr.cancel)),
+        FilledButton(onPressed: () => Navigator.of(dialogContext).pop(controller.text), child: Text(tr.save)),
+      ],
+    ),
+  );
+  controller.dispose();
+  if (name == null) return;
+  try {
+    await model.renamePeer(peer.id, name);
   } on CoreError catch (e) {
     showSnack(tr.error(e.code));
   }
@@ -284,7 +336,20 @@ class _ShareTargets extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(what, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
             ),
-            if (peers.isEmpty)
+            if (payload.files.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.add_link_rounded),
+                title: Text(tr.filesByLink),
+                subtitle: Text(tr.filesByLinkHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  final ctx = navigatorKey.currentContext;
+                  if (ctx == null) return;
+                  // Копии из «Поделиться» живут в кэше — ядро заберёт их к ссылке.
+                  createAndShareLink(ctx, 'files', paths: payload.files, takeFiles: true);
+                },
+              ),
+            if (peers.isEmpty && payload.files.isEmpty)
               Padding(padding: const EdgeInsets.all(16), child: Text(tr.shareNoDevices))
             else
               Flexible(

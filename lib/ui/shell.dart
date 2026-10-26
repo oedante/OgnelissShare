@@ -1,5 +1,6 @@
 // Оболочка главного экрана: вопросы «Подключить?» и «Принять файлы?»,
-// уведомления о полученном и «Поделиться» из других приложений.
+// уведомления о полученном, «Поделиться» из других приложений и открытые
+// ссылки-приглашения.
 
 import 'dart:async';
 
@@ -9,9 +10,11 @@ import 'package:flutter/services.dart';
 import '../app/app_model.dart';
 import '../app/format.dart';
 import '../core/models.dart';
+import '../core/native.dart';
 import '../platform/files.dart';
 import '../platform/platform_bridge.dart';
 import '../l10n/l10n.dart';
+import 'join_screen.dart';
 import 'send_sheet.dart';
 import 'widgets.dart';
 
@@ -54,8 +57,11 @@ class _ShellState extends State<Shell> {
       _sub?.cancel();
       _model = model;
       _sub = model.events.listen(_onEvent);
-      PlatformBridge.listen(onPreparing: _onSharing, onShared: _takeShare);
-      WidgetsBinding.instance.addPostFrameCallback((_) => _takeShare());
+      PlatformBridge.listen(onPreparing: _onSharing, onShared: _takeShare, onLink: _takeLink);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _takeShare();
+        _takeLink();
+      });
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkRequests());
   }
@@ -124,6 +130,8 @@ class _ShellState extends State<Shell> {
         _showText(e);
       case 'peer_removed':
         showSnack(tr.peerRemoved(tr.deviceName(e.name)));
+      case 'joined':
+        if (e.str('via') == 'link') showSnack(tr.joinedViaLink(tr.deviceName(e.name)));
     }
   }
 
@@ -151,6 +159,22 @@ class _ShellState extends State<Shell> {
     final ctx = navigatorKey.currentContext;
     if (ctx == null || !ctx.mounted) return;
     await showShareTargetSheet(ctx, payload);
+  }
+
+  // ------------------------------------------------------------ ссылки
+
+  /// Приложение открыли ссылкой-приглашением (Android).
+  Future<void> _takeLink() async {
+    final uri = await PlatformBridge.takeLink();
+    final model = _model;
+    if (uri == null || uri.isEmpty || model == null || !mounted) return;
+    try {
+      final info = await model.useInvite(uri);
+      await navigatorKey.currentState?.push(MaterialPageRoute<void>(builder: (_) => JoinScreen(info: info)));
+    } on CoreError catch (e) {
+      // Адрес сайта без приглашения (например, страница о приложении) — молча.
+      if (e.code != 'bad_link') showSnack(tr.error(e.code));
+    }
   }
 }
 
@@ -213,7 +237,7 @@ class _RequestDialogState extends State<RequestDialog> {
               ),
             ),
             const SizedBox(height: 12),
-            Text(tr.pairRequestBody, textAlign: TextAlign.center),
+            Text(r.viaLink ? tr.pairRequestLinkBody : tr.pairRequestBody, textAlign: TextAlign.center),
           ],
         ),
         actions: [

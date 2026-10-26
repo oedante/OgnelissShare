@@ -2,11 +2,16 @@
 """Значок Ogneliss Share: огненная лиса внутри кольца из двух стрелок обмена.
 
 Оформление — как у остальных приложений линейки (Ogneliss Dialer, Ogneliss
-Mail): сланцевый фон #3A4450, светлый знак #D3D8DC, золотое пламя #CCAA6D
-со светлой лисой. Пламя с лисой — общий логотип «Огнелисс»
-(tool/branding/ogneliss-flame.svg, тот же файл, что на ogneliss.ru).
+Mail): сланцевый фон #3A4450, светлый знак, золотое пламя #CCAA6D со светлой
+лисой. Пламя с лисой — общий знак «Огнелисс» (tool/branding/ogneliss-mark.svg,
+тот же, что у Ogneliss Mail и Dialer): лиса с двумя ушами — отверстия в пламени.
 
-Запуск (нужны Pillow, numpy, scipy и cairosvg):
+Стрелки — в духе пламени: сужаются к хвосту, как языки огня, и кончаются
+острым наконечником с вогнутыми сторонами; объём дают переход от белого к
+светло-серому и мягкая тень. Одноцветный слой (Android 13+) — те же формы
+без перехода и тени.
+
+Запуск (нужны Pillow, numpy, scipy, cairosvg и opencv-python):
 
     python3 tool/branding/make_icon.py
 
@@ -25,12 +30,14 @@ import math
 from pathlib import Path
 
 import cairosvg
+import cv2
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 from scipy import ndimage
 
 ROOT = Path(__file__).resolve().parents[2]
-FLAME_SVG = ROOT / 'tool' / 'branding' / 'ogneliss-flame.svg'
+FLAME_SVG = ROOT / 'tool' / 'branding' / 'ogneliss-mark.svg'
+MARK_UNITS = 5016  # viewBox знака
 
 SLATE = (0x3A, 0x44, 0x50)
 GLYPH = (0xD3, 0xD8, 0xDC)
@@ -46,33 +53,75 @@ def hexc(c):
 
 # ---------------------------------------------------------------- стрелки
 
-def arrows_svg(size, color, ring_r, stroke, cx=None, cy=None):
-    """Два дуговых указателя, бегущих друг за другом по кольцу (обмен)."""
+ARROW_TOP = '#FFFFFF'
+ARROW_BOTTOM = '#C5CCD3'
+# Две дуги, бегущие друг за другом по кольцу (градусы, по часовой от «3 часов»).
+ARCS = ((200.0, 306.0), (20.0, 126.0))
+
+
+def _pt(cx, cy, r, deg):
+    a = math.radians(deg)
+    return cx + r * math.cos(a), cy + r * math.sin(a)
+
+
+def swoosh_d(cx, cy, ring_r, a0, a1, stroke, n=140):
+    """Контур одной стрелки (путь SVG): хвост — острый, тело плавно
+    расширяется, наконечник — по касательной к кольцу, острие повторяет его
+    изгиб, стороны слегка вогнуты."""
+    w_tail, w_neck = stroke * 0.03, stroke * 0.80
+    outer, inner = [], []
+    for i in range(n + 1):
+        t = i / n
+        a = a0 + (a1 - a0) * t
+        w = w_tail + (w_neck - w_tail) * (1 - (1 - t) ** 2.3)
+        outer.append(_pt(cx, cy, ring_r + w, a))
+        inner.append(_pt(cx, cy, ring_r - w, a))
+    ar = math.radians(a1)
+    nx, ny = math.cos(ar), math.sin(ar)       # наружу от центра
+    tx, ty = -math.sin(ar), math.cos(ar)      # вперёд, по часовой
+    ncx, ncy = cx + ring_r * nx, cy + ring_r * ny
+    length, half, back = stroke * 2.05, stroke * 1.38, stroke * 0.30
+    bend = length * length / (2 * ring_r)
+    tip = (ncx + tx * length - nx * bend, ncy + ty * length - ny * bend)
+    barb_out = (ncx + nx * half - tx * back, ncy + ny * half - ty * back)
+    barb_in = (ncx - nx * half - tx * back, ncy - ny * half - ty * back)
+    axis = ((ncx + tip[0]) / 2, (ncy + tip[1]) / 2)
+
+    def ctrl(p, q, k=0.16):
+        mx, my = (p[0] + q[0]) / 2, (p[1] + q[1]) / 2
+        return mx + (axis[0] - mx) * k, my + (axis[1] - my) * k
+
+    f = lambda p: f'{p[0]:.1f} {p[1]:.1f}'  # noqa: E731
+    d = 'M' + f(outer[0]) + ''.join(' L' + f(p) for p in outer[1:])
+    d += f' L{f(barb_out)} Q{f(ctrl(barb_out, tip))} {f(tip)} Q{f(ctrl(tip, barb_in))} {f(barb_in)}'
+    d += ''.join(' L' + f(p) for p in reversed(inner)) + ' Z'
+    return d
+
+
+def arrows_svg(size, ring_r, stroke, fill, cx=None, cy=None):
+    """Обе стрелки; fill — цвет или url(#…) перехода."""
     cx = size / 2 if cx is None else cx
     cy = size / 2 if cy is None else cy
-    parts = []
-    # Дуга A: слева сверху по часовой — к правому краю; дуга B — симметрично снизу.
-    for start, end in ((208.0, 322.0), (28.0, 142.0)):
-        a0, a1 = math.radians(start), math.radians(end)
-        x0, y0 = cx + ring_r * math.cos(a0), cy + ring_r * math.sin(a0)
-        x1, y1 = cx + ring_r * math.cos(a1), cy + ring_r * math.sin(a1)
-        parts.append(
-            f'<path d="M{x0:.1f} {y0:.1f} A{ring_r:.1f} {ring_r:.1f} 0 0 1 {x1:.1f} {y1:.1f}" '
-            f'fill="none" stroke="{hexc(color)}" stroke-width="{stroke:.1f}" '
-            f'stroke-linecap="round"/>')
-        # Наконечник: треугольник по касательной в конце дуги.
-        tx, ty = -math.sin(a1), math.cos(a1)      # касательная по часовой
-        nx, ny = math.cos(a1), math.sin(a1)       # нормаль наружу
-        head_len, head_w = stroke * 1.55, stroke * 1.25
-        bx, by = x1 - tx * stroke * 0.25, y1 - ty * stroke * 0.25
-        tip = (x1 + tx * head_len, y1 + ty * head_len)
-        left = (bx + nx * head_w, by + ny * head_w)
-        right = (bx - nx * head_w, by - ny * head_w)
-        parts.append(
-            f'<path d="M{left[0]:.1f} {left[1]:.1f} L{tip[0]:.1f} {tip[1]:.1f} '
-            f'L{right[0]:.1f} {right[1]:.1f} Z" fill="{hexc(color)}" '
-            f'stroke="{hexc(color)}" stroke-width="{stroke * 0.32:.1f}" stroke-linejoin="round"/>')
-    return '\n'.join(parts)
+    return '\n'.join(f'<path d="{swoosh_d(cx, cy, ring_r, a0, a1, stroke)}" fill="{fill}"/>'
+                     for a0, a1 in ARCS)
+
+
+def arrows_gradient(gid='arrows'):
+    """Свет сверху: у каждой стрелки — от белого к светло-серому."""
+    return (f'<linearGradient id="{gid}" x1="0" y1="0" x2="0" y2="1">'
+            f'<stop offset="0" stop-color="{ARROW_TOP}"/><stop offset="1" stop-color="{ARROW_BOTTOM}"/>'
+            f'</linearGradient>')
+
+
+def with_shadow(layer, size):
+    """Мягкая тень под знаком — он чуть приподнят над фоном."""
+    alpha = layer.split()[3]
+    shadow = Image.new('RGBA', layer.size, (8, 12, 18, 0))
+    shadow.putalpha(alpha.point(lambda v: int(v * 0.6)).filter(ImageFilter.GaussianBlur(size * 0.009)))
+    out = Image.new('RGBA', layer.size, (0, 0, 0, 0))
+    out.alpha_composite(shadow, (0, int(size * 0.011)))
+    out.alpha_composite(layer)
+    return out
 
 
 def render_svg(svg_text, size):
@@ -83,28 +132,42 @@ def render_svg(svg_text, size):
 
 # ---------------------------------------------------------------- пламя с лисой
 
-def flame_layer(size, box, color=GOLD, fox=FOX):
-    """Пламя с лисой в квадрате box=(x, y, side). Лиса — светлая заливка выреза."""
-    x, y, side = box
+def fox_mask(side):
+    """Знак в квадрате side: (альфа пламени, маска лисы). Лиса — отверстия в
+    пламени: туловище с первым ухом открыто к краю узкой щелью внизу (её
+    закрываем «наружным» замыканием и берём самое большое отверстие), второе
+    ухо — отдельное, полностью замкнутое отверстие. Вырезы между языками
+    пламени тоже узкие, но они не замкнуты и в лису не попадают."""
     flame = Image.open(io.BytesIO(cairosvg.svg2png(
         url=str(FLAME_SVG), output_width=side, output_height=side))).convert('RGBA')
     alpha = np.array(flame)[:, :, 3]
     solid = alpha > 127
-    # Вырез лисы открыт к краю пламени узкой щелью внизу: закрываем щели
-    # «наружным» замыканием и берём самый большой внутренний остаток — лису.
+
+    def edge_labels(lab):
+        return set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
+
+    # Полностью замкнутые отверстия (второе ухо).
+    lab0, _ = ndimage.label(~solid)
+    enclosed = (~solid) & ~np.isin(lab0, list(edge_labels(lab0)))
+    # Туловище: самое большое отверстие после закрытия щели.
     r = max(2, int(side * 0.037))
     st = ndimage.generate_binary_structure(2, 1)
     grown = ndimage.binary_dilation(solid, structure=st, iterations=r)
     lab, _ = ndimage.label(~grown)
-    border = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
-    outside = ndimage.binary_dilation(np.isin(lab, list(border)), structure=st, iterations=r)
+    outside = ndimage.binary_dilation(np.isin(lab, list(edge_labels(lab))), structure=st, iterations=r)
     hole = (~solid) & (~outside)
     lab2, n2 = ndimage.label(hole)
     if n2:
         sizes = ndimage.sum(hole, lab2, range(1, n2 + 1))
         hole = lab2 == (int(np.argmax(sizes)) + 1)
         hole = ndimage.binary_dilation(hole, iterations=2) & ~solid | hole
+    return alpha, hole | enclosed
 
+
+def flame_layer(size, box, color=GOLD, fox=FOX):
+    """Пламя с лисой в квадрате box=(x, y, side). Лиса — светлая заливка отверстий."""
+    x, y, side = box
+    alpha, hole = fox_mask(side)
     layer = np.zeros((side, side, 4), np.uint8)
     if fox is not None:
         layer[hole] = (*fox, 255)
@@ -117,16 +180,42 @@ def flame_layer(size, box, color=GOLD, fox=FOX):
     return canvas
 
 
+def fox_path_d(px=2048):
+    """Контур лисы в единицах знака — для векторного логотипа (там она
+    светлая, как на значке, а не вырез)."""
+    _, hole = fox_mask(px)
+    contours, _ = cv2.findContours(hole.astype(np.uint8), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+    k = MARK_UNITS / px
+    parts = []
+    for c in contours:
+        if cv2.contourArea(c) < px * 0.5:
+            continue
+        c = cv2.approxPolyDP(c, 0.6, True)
+        pts = ' L'.join(f'{p[0][0] * k:.0f} {p[0][1] * k:.0f}' for p in c)
+        parts.append(f'M{pts} Z')
+    return ' '.join(parts)
+
+
+def mark_path_d():
+    """Путь пламени из файла знака."""
+    import re
+    src = FLAME_SVG.read_text(encoding='utf-8')
+    return re.search(r'<path[^>]*\sd="([^"]*)"', src, re.S).group(1)
+
+
 # ---------------------------------------------------------------- сборка
 
 def glyph(size, scale=1.0, mono=None):
     """Кольцо стрелок + пламя. scale — доля холста, занятая знаком."""
-    ring_r = size * 0.335 * scale
-    stroke = size * 0.072 * scale
-    color = GLYPH if mono is None else mono
-    arrows = render_svg(
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
-        f'viewBox="0 0 {size} {size}">{arrows_svg(size, color, ring_r, stroke)}</svg>', size)
+    ring_r = size * 0.325 * scale
+    stroke = size * 0.074 * scale
+    head = f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 {size} {size}">'
+    if mono is None:
+        arrows = render_svg(f'{head}<defs>{arrows_gradient()}</defs>'
+                            f'{arrows_svg(size, ring_r, stroke, "url(#arrows)")}</svg>', size)
+        arrows = with_shadow(arrows, size)
+    else:
+        arrows = render_svg(f'{head}{arrows_svg(size, ring_r, stroke, hexc(mono))}</svg>', size)
     side = int(size * 0.46 * scale)
     fx = (size - side) // 2 + int(side * 0.01)
     fy = (size - side) // 2 - int(side * 0.02)
@@ -147,13 +236,21 @@ def tile(size, radius_frac=None, margin_frac=0.0, shadow=False):
         ImageDraw.Draw(sh).rounded_rectangle(
             (m, m + int(size * 0.012), size - m - 1, size - m - 1 + int(size * 0.012)),
             radius=int((size - 2 * m) * (radius_frac or 0)), fill=(0, 0, 0, 90))
-        from PIL import ImageFilter
         img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(size * 0.012)))
+    shape = Image.new('L', (size, size), 0)
     if radius_frac:
-        d = ImageDraw.Draw(img)
-        d.rounded_rectangle(box, radius=int((size - 2 * m) * radius_frac), fill=(*SLATE, 255))
+        ImageDraw.Draw(shape).rounded_rectangle(box, radius=int((size - 2 * m) * radius_frac), fill=255)
     else:
-        d.rectangle(box, fill=(*SLATE, 255))
+        ImageDraw.Draw(shape).rectangle(box, fill=255)
+    plate = Image.new('RGBA', (size, size), (*SLATE, 255))
+    # Едва заметный свет сверху — фон не плоский.
+    glow = Image.new('L', (size, size), 0)
+    ImageDraw.Draw(glow).ellipse((-size * 0.2, -size * 0.55, size * 1.2, size * 0.75), fill=26)
+    light = Image.new('RGBA', (size, size), (255, 255, 255, 0))
+    light.putalpha(glow.filter(ImageFilter.GaussianBlur(size * 0.12)))
+    plate.alpha_composite(light)
+    plate.putalpha(shape)
+    img.alpha_composite(plate)
     return img, m
 
 
@@ -166,21 +263,26 @@ def compose(size, radius_frac=None, margin_frac=0.0, shadow=False):
 
 
 def logo_svg():
-    """Векторный логотип: плитка, стрелки и пламя (лиса — вырез, как на сайте)."""
+    """Векторный логотип: плитка, стрелки, пламя и светлая лиса — как значок."""
     size = 1024
-    flame_src = FLAME_SVG.read_text(encoding='utf-8')
-    inner = flame_src[flame_src.index('>', flame_src.index('<svg')) + 1: flame_src.rindex('</svg>')]
     side = size * 0.46
     fx = (size - side) / 2 + side * 0.01
     fy = (size - side) / 2 - side * 0.02
-    s = side / 150.0
+    s = side / MARK_UNITS
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">\n'
         '  <!-- Ogneliss Share: огненная лиса в кольце обмена. Генерируется '
         'tool/branding/make_icon.py -->\n'
-        f'  <rect width="1024" height="1024" rx="230" fill="{hexc(SLATE)}"/>\n'
-        f'  {arrows_svg(size, GLYPH, size * 0.335, size * 0.072)}\n'
-        f'  <g transform="translate({fx:.1f} {fy:.1f}) scale({s:.4f})">{inner}</g>\n'
+        f'  <defs>{arrows_gradient()}'
+        '<linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">'
+        '<stop offset="0" stop-color="#46505C"/><stop offset="1" stop-color="#3A4450"/>'
+        '</linearGradient></defs>\n'
+        '  <rect width="1024" height="1024" rx="230" fill="url(#plate)"/>\n'
+        f'  {arrows_svg(size, size * 0.325, size * 0.074, "url(#arrows)")}\n'
+        f'  <g transform="translate({fx:.1f} {fy:.1f}) scale({s:.6f})">\n'
+        f'    <path fill="{hexc(FOX)}" fill-rule="evenodd" d="{fox_path_d()}"/>\n'
+        f'    <path fill="{hexc(GOLD)}" fill-rule="evenodd" d="{mark_path_d()}"/>\n'
+        '  </g>\n'
         '</svg>\n')
 
 

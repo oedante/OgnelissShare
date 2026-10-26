@@ -1,4 +1,5 @@
-// Подключение по отсканированному коду: ждём ответа другого устройства.
+// Подключение по отсканированному коду или ссылке из сообщения: ждём
+// ответа другого устройства.
 
 import 'dart:async';
 
@@ -7,8 +8,10 @@ import 'package:flutter/material.dart';
 import '../app/app_model.dart';
 import '../app/theme.dart';
 import '../core/models.dart';
+import '../core/native.dart';
 import '../l10n/l10n.dart';
 import 'scan_screen.dart';
+import 'shell.dart';
 import 'widgets.dart';
 
 class JoinScreen extends StatefulWidget {
@@ -58,6 +61,25 @@ class _JoinScreenState extends State<JoinScreen> {
     if (name.isNotEmpty) _name = name;
   }
 
+  /// Ещё раз: ссылку из сообщения — сразу (она действует сутки), QR-код —
+  /// отсканировать заново.
+  Future<void> _retry() async {
+    final info = widget.info;
+    if (!info.remote) {
+      await Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => const ScanScreen()));
+      return;
+    }
+    final model = AppScope.read(context);
+    final navigator = Navigator.of(context);
+    try {
+      final again = await model.useInvite(info.uri);
+      if (!mounted) return;
+      await navigator.pushReplacement(MaterialPageRoute<void>(builder: (_) => JoinScreen(info: again)));
+    } on CoreError catch (e) {
+      showSnack(tr.error(e.code));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final info = widget.info;
@@ -69,6 +91,14 @@ class _JoinScreenState extends State<JoinScreen> {
         children: [
           Text(tr.joining(name), textAlign: TextAlign.center, style: theme.textTheme.titleMedium),
           const SizedBox(height: 24),
+          if (info.remote && !info.once) ...[
+            Text(
+              tr.joinWaitingLink(name),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+          ],
           if (!info.once) ...[
             Text(tr.joinCheckCode, textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
             const SizedBox(height: 12),
@@ -91,7 +121,9 @@ class _JoinScreenState extends State<JoinScreen> {
           const Icon(Icons.check_circle_rounded, size: 64, color: Brand.ok),
           const SizedBox(height: 16),
           Text(
-            info.once ? tr.joinDoneOnce(name) : tr.joinDone(name),
+            info.files
+                ? tr.joinDoneFiles(name)
+                : (info.once ? tr.joinDoneOnce(name) : tr.joinDone(name)),
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium,
           ),
@@ -114,12 +146,7 @@ class _JoinScreenState extends State<JoinScreen> {
             runSpacing: 12,
             alignment: WrapAlignment.center,
             children: [
-              FilledButton(
-                onPressed: () => Navigator.of(context).pushReplacement(
-                  MaterialPageRoute<void>(builder: (_) => const ScanScreen()),
-                ),
-                child: Text(tr.retry),
-              ),
+              FilledButton(onPressed: _retry, child: Text(tr.retry)),
               OutlinedButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr.close)),
             ],
           ),
@@ -128,7 +155,7 @@ class _JoinScreenState extends State<JoinScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(info.once ? tr.modeOnce : tr.addTitle)),
+      appBar: AppBar(title: Text(info.files ? tr.filesByLink : (info.once ? tr.modeOnce : tr.addTitle))),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
         children: [
