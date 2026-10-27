@@ -47,14 +47,6 @@
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png" />
-      <Extensions>
-        <desktop2:Extension Category="windows.firewallRules">
-          <desktop2:FirewallRules Executable="ogneliss_share.exe">
-            <desktop2:Rule Direction="in" IPProtocol="UDP" Profile="domainAndPrivate" />
-            <desktop2:Rule Direction="in" IPProtocol="TCP" Profile="domainAndPrivate" />
-          </desktop2:FirewallRules>
-        </desktop2:Extension>
-      </Extensions>
     </Application>
   </Applications>
 
@@ -63,4 +55,14 @@
     <Capability Name="privateNetworkClientServer" />
     <rescap:Capability Name="runFullTrust" />
   </Capabilities>
+
+  <!-- Правила брандмауэра — только на уровне пакета (требование makeappx). -->
+  <Extensions>
+    <desktop2:Extension Category="windows.firewallRules">
+      <desktop2:FirewallRules Executable="ogneliss_share.exe">
+        <desktop2:Rule Direction="in" IPProtocol="UDP" Profile="domainAndPrivate" />
+        <desktop2:Rule Direction="in" IPProtocol="TCP" Profile="domainAndPrivate" />
+      </desktop2:FirewallRules>
+    </desktop2:Extension>
+  </Extensions>
 </Package>
