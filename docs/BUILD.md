@@ -1,5 +1,8 @@
 # Сборка для Android и Windows
 
+> macOS, iOS, Linux и выпуск в Google Play, App Store и Microsoft Store —
+> в [RELEASE.md](RELEASE.md).
+
 Инструкция для компьютера с Windows 10/11 (64-бит): на нём собираются и
 приложение для Windows, и APK для Android. На Linux и macOS шаги те же,
 меняются только способы установки программ.
