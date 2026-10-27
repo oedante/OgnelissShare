@@ -1,0 +1,338 @@
+[bootstrap] C:\hostedtoolcache\windows\flutter\stable-3.47.8-x64/flutter/bin\flutter.BAT create --org com.ogneliss --project-name ogneliss_share --platforms android,ios,macos,windows,linux --no-pub .
+Recreating project ....
+  .idea\libraries\Dart_SDK.xml (created)
+  .idea\libraries\KotlinJavaRuntime.xml (created)
+  .idea\modules.xml (created)
+  .idea\runConfigurations\main_dart.xml (created)
+  .idea\workspace.xml (created)
+  android\app\build.gradle.kts (created)
+  android\app\src\main\kotlin\com\ogneliss\ogneliss_share\MainActivity.kt (created)
+  android\build.gradle.kts (created)
+  android\ogneliss_share_android.iml (created)
+  android\.gitignore (created)
+  android\app\src\debug\AndroidManifest.xml (created)
+  android\app\src\main\AndroidManifest.xml (created)
+  android\app\src\main\res\drawable\launch_background.xml (created)
+  android\app\src\main\res\drawable-v21\launch_background.xml (created)
+  android\app\src\main\res\mipmap-hdpi\ic_launcher.png (created)
+  android\app\src\main\res\mipmap-mdpi\ic_launcher.png (created)
+  android\app\src\main\res\mipmap-xhdpi\ic_launcher.png (created)
+  android\app\src\main\res\mipmap-xxhdpi\ic_launcher.png (created)
+  android\app\src\main\res\mipmap-xxxhdpi\ic_launcher.png (created)
+  android\app\src\main\res\values\styles.xml (created)
+  android\app\src\main\res\values-night\styles.xml (created)
+  android\app\src\profile\AndroidManifest.xml (created)
+  android\gradle\wrapper\gradle-wrapper.properties (created)
+  android\gradle.properties (created)
+  android\settings.gradle.kts (created)
+  ios\.gitignore (created)
+  ios\Flutter\AppFrameworkInfo.plist (created)
+  ios\Flutter\Debug.xcconfig (created)
+  ios\Flutter\Release.xcconfig (created)
+  ios\Runner\AppDelegate.swift (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Contents.json (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-1024x1024@1x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-20x20@1x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-20x20@2x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-20x20@3x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-29x29@1x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-29x29@2x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-29x29@3x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-40x40@1x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-40x40@2x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-40x40@3x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-60x60@2x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-60x60@3x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-76x76@1x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-76x76@2x.png (created)
+  ios\Runner\Assets.xcassets\AppIcon.appiconset\Icon-App-83.5x83.5@2x.png (created)
+  ios\Runner\Assets.xcassets\LaunchImage.imageset\Contents.json (created)
+  ios\Runner\Assets.xcassets\LaunchImage.imageset\LaunchImage.png (created)
+  ios\Runner\Assets.xcassets\LaunchImage.imageset\LaunchImage@2x.png (created)
+  ios\Runner\Assets.xcassets\LaunchImage.imageset\LaunchImage@3x.png (created)
+  ios\Runner\Assets.xcassets\LaunchImage.imageset\README.md (created)
+  ios\Runner\Base.lproj\LaunchScreen.storyboard (created)
+  ios\Runner\Base.lproj\Main.storyboard (created)
+  ios\Runner\Info.plist (created)
+  ios\Runner\Runner-Bridging-Header.h (created)
+  ios\Runner\SceneDelegate.swift (created)
+  ios\Runner.xcodeproj\project.pbxproj (created)
+  ios\Runner.xcodeproj\project.xcworkspace\contents.xcworkspacedata (created)
+  ios\Runner.xcodeproj\project.xcworkspace\xcshareddata\IDEWorkspaceChecks.plist (created)
+  ios\Runner.xcodeproj\project.xcworkspace\xcshareddata\WorkspaceSettings.xcsettings (created)
+  ios\Runner.xcodeproj\xcshareddata\xcschemes\Runner.xcscheme (created)
+  ios\Runner.xcworkspace\contents.xcworkspacedata (created)
+  ios\Runner.xcworkspace\xcshareddata\IDEWorkspaceChecks.plist (created)
+  ios\Runner.xcworkspace\xcshareddata\WorkspaceSettings.xcsettings (created)
+  ios\RunnerTests\RunnerTests.swift (created)
+  linux\.gitignore (created)
+  linux\CMakeLists.txt (created)
+  linux\flutter\CMakeLists.txt (created)
+  linux\runner\CMakeLists.txt (created)
+  linux\runner\main.cc (created)
+  linux\runner\my_application.cc (created)
+  linux\runner\my_application.h (created)
+  macos\.gitignore (created)
+  macos\Flutter\Flutter-Debug.xcconfig (created)
+  macos\Flutter\Flutter-Release.xcconfig (created)
+  macos\Runner\AppDelegate.swift (created)
+  macos\Runner\Assets.xcassets\AppIcon.appiconset\app_icon_1024.png (created)
+  macos\Runner\Assets.xcassets\AppIcon.appiconset\app_icon_128.png (created)
+  macos\Runner\Assets.xcassets\AppIcon.appiconset\app_icon_16.png (created)
+  macos\Runner\Assets.xcassets\AppIcon.appiconset\app_icon_256.png (created)
+  macos\Runner\Assets.xcassets\AppIcon.appiconset\app_icon_32.png (created)
+  macos\Runner\Assets.xcassets\AppIcon.appiconset\app_icon_512.png (created)
+  macos\Runner\Assets.xcassets\AppIcon.appiconset\app_icon_64.png (created)
+  macos\Runner\Assets.xcassets\AppIcon.appiconset\Contents.json (created)
+  macos\Runner\Base.lproj\MainMenu.xib (created)
+  macos\Runner\Configs\AppInfo.xcconfig (created)
+  macos\Runner\Configs\Debug.xcconfig (created)
+  macos\Runner\Configs\Release.xcconfig (created)
+  macos\Runner\Configs\Warnings.xcconfig (created)
+  macos\Runner\DebugProfile.entitlements (created)
+  macos\Runner\Info.plist (created)
+  macos\Runner\MainFlutterWindow.swift (created)
+  macos\Runner\Release.entitlements (created)
+  macos\Runner.xcodeproj\project.pbxproj (created)
+  macos\Runner.xcodeproj\project.xcworkspace\xcshareddata\IDEWorkspaceChecks.plist (created)
+  macos\Runner.xcodeproj\xcshareddata\xcschemes\Runner.xcscheme (created)
+  macos\Runner.xcworkspace\contents.xcworkspacedata (created)
+  macos\Runner.xcworkspace\xcshareddata\IDEWorkspaceChecks.plist (created)
+  macos\RunnerTests\RunnerTests.swift (created)
+  ogneliss_share.iml (created)
+  windows\.gitignore (created)
+  windows\CMakeLists.txt (created)
+  windows\flutter\CMakeLists.txt (created)
+  windows\runner\CMakeLists.txt (created)
+  windows\runner\flutter_window.cpp (created)
+  windows\runner\flutter_window.h (created)
+  windows\runner\main.cpp (created)
+  windows\runner\resource.h (created)
+  windows\runner\resources\app_icon.ico (created)
+  windows\runner\runner.exe.manifest (created)
+  windows\runner\Runner.rc (created)
+  windows\runner\utils.cpp (created)
+  windows\runner\utils.h (created)
+  windows\runner\win32_window.cpp (created)
+  windows\runner\win32_window.h (created)
+Wrote 118 files.
+
+All done!
+You can find general documentation for Flutter at: https://docs.flutter.dev/
+Detailed API documentation is available at: https://api.flutter.dev/
+If you prefer video documentation, consider: https://www.youtube.com/c/flutterdev
+
+In order to run your application, type:
+
+  $ flutter run
+
+Your application code is in .\lib\main.dart.
+
+[bootstrap] накладка tool/platform применена
+[bootstrap] удалена шаблонная android\app\src\main\kotlin\com\ogneliss\ogneliss_share\MainActivity.kt
+[bootstrap] android: com.ogneliss.share, minSdk 24, подпись из key.properties
+[bootstrap] ios: Info.plist, переводы, идентификатор, манифест приватности, без резервных копий ключа
+[bootstrap] macos: права песочницы, камера, название, переводы меню и запросов, манифест приватности
+[bootstrap] windows: заголовок окна и сведения о файле
+[bootstrap] linux: идентификатор и заголовок окна
+[bootstrap] C:\hostedtoolcache\windows\flutter\stable-3.47.8-x64/flutter/bin\flutter.BAT pub get
+Resolving dependencies...
+Downloading packages...
++ android_file_picker 2.1.2
++ args 2.7.0
++ async 2.13.1
++ boolean_selector 2.1.2
+  characters 1.4.1 (from direct dependency to transitive dependency)
++ clock 1.1.3
++ code_assets 1.2.1 (2.1.0 available)
+  collection 1.19.1 (from direct dependency to transitive dependency)
++ cross_file 0.3.5+5 (0.4.0 available)
++ crypto 3.0.8
++ dbus 0.8.0
++ fake_async 1.3.3
++ ffi 2.2.0
++ ffi_leak_tracker 0.1.2
++ file_picker 13.3.0
++ file_picker_darwin 2.4.0
++ file_picker_linux 2.0.2
++ file_picker_platform_interface 4.2.0
++ file_picker_web 4.2.0
++ flutter 0.0.0 from sdk flutter
++ flutter_lints 6.0.0
++ flutter_localizations 0.0.0 from sdk flutter
++ flutter_test 0.0.0 from sdk flutter
++ flutter_web_plugins 0.0.0 from sdk flutter
++ hooks 2.0.2 (2.2.0 available)
++ jni 1.1.0
++ jni_flutter 1.0.4+1
++ jni_util 1.0.0
++ leak_tracker 11.0.2
++ leak_tracker_flutter_testing 3.0.10
++ leak_tracker_testing 3.0.2
++ lints 6.1.0
++ logging 1.3.0
++ matcher 0.12.20
+  material_color_utilities 0.13.0 (from direct dependency to transitive dependency) (0.13.1 available)
+  meta 1.18.3 (from direct dependency to transitive dependency) (1.19.0 available)
++ mobile_scanner 7.4.2
++ objective_c 9.5.0 (9.6.2 available)
++ ogneliss_core 0.1.0 from path rust_builder
++ open_filex 4.7.0 (5.0.0 available)
++ package_config 3.0.0
++ path_provider 2.1.6
++ path_provider_android 2.3.1
++ path_provider_foundation 2.6.0
++ path_provider_linux 2.2.2
++ path_provider_platform_interface 2.1.3
++ path_provider_windows 2.3.0
++ petitparser 7.0.2 (7.1.0 available)
++ platform 3.2.0
++ plugin_platform_interface 2.1.8
++ pub_semver 2.2.1
++ qr 3.0.2 (4.0.0 available)
++ qr_flutter 4.1.0
++ record_use 0.6.0 (1.1.1 available)
++ sky_engine 0.0.0 from sdk flutter
++ source_span 1.10.2
++ stack_trace 1.12.2
++ stream_channel 2.1.4
++ string_scanner 1.4.1
++ term_glyph 1.2.2
++ test_api 0.7.12 (0.7.15 available)
++ url_launcher 6.3.3
++ url_launcher_android 6.3.33
++ url_launcher_ios 6.4.2
++ url_launcher_linux 3.2.3
++ url_launcher_macos 3.2.6
++ url_launcher_platform_interface 2.3.2
++ url_launcher_web 2.4.3
++ url_launcher_windows 3.1.6
+  vector_math 2.4.0 (from direct dependency to transitive dependency) (2.4.3 available)
++ vm_service 15.4.0
++ web 1.1.2
++ win32 6.4.0
++ windows_file_picker 2.0.1
++ xdg_directories 1.1.0
++ xml 7.0.1 (7.1.0 available)
++ yaml 3.1.4
+Changed 77 dependencies!
+13 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+[bootstrap] C:\hostedtoolcache\windows\flutter\stable-3.47.8-x64/flutter/bin\flutter.BAT gen-l10n
+Because l10n.yaml exists, the options defined there will be used instead.
+To use the command line arguments, delete the l10n.yaml file in the Flutter project.
+
+
+[bootstrap] готово
+[build] Ogneliss Share 0.1.1 (2) — windows
+[build] C:\hostedtoolcache\windows\flutter\stable-3.47.8-x64/flutter/bin\flutter.BAT build windows --release --build-name=0.1.1 --build-number=2
+Building Windows application...                                   324.3s
+√ Built build\windows\x64\runner\Release\ogneliss_share.exe
+[build] ⚠ в store/windows/identity.json пробные значения: пакет годится для проверки на своём компьютере, Partner Center его не примет (см. docs/RELEASE.md)
+[build] C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\makepri.exe createconfig /cf D:\a\OgnelissShare\OgnelissShare\build\msix\priconfig.xml /dq en-US /o
+' P l a t f o r m   ( p v ) '   n o t   s p e c i f i e d .   D e f a u l t   i s   W i n d o w s   1 0 .  
+ W r i t i n g   P R I   c o n f i g   f i l e   t o   D : \ a \ O g n e l i s s S h a r e \ O g n e l i s s S h a r e \ b u i l d \ m s i x \ p r i c o n f i g . x m l   . . .  
+ S u c c e s s f u l l y   C o m p l e t e d  
+ [build] C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\makepri.exe new /pr D:\a\OgnelissShare\OgnelissShare\build\msix\pri /cf D:\a\OgnelissShare\OgnelissShare\build\msix\priconfig.xml /mn D:\a\OgnelissShare\OgnelissShare\build\msix\pri\AppxManifest.xml /of D:\a\OgnelissShare\OgnelissShare\build\msix\layout\resources.pri /o
+I n d e x   P a s s   C o m p l e t e d .  
+ A l t e r n a t e F o r m   Q u a l i f i e r s :   U N P L A T E D  
+ S c a l e   Q u a l i f i e r s :   1 0 0 , 1 2 5 , 1 5 0 , 2 0 0 , 4 0 0  
+ T a r g e t S i z e   Q u a l i f i e r s :   2 5 6 , 1 6 , 2 4 , 3 2 , 4 8  
+  
+ F i n i s h e d   b u i l d i n g  
+ V e r s i o n :   1 . 0  
+ R e s o u r c e   M a p   N a m e :   O g n e l i s s . S h a r e  
+ N a m e d   R e s o u r c e s :   4  
+  
+ R e s o u r c e   F i l e :   r e s o u r c e s . p r i  
+ V e r s i o n :   1 . 0  
+ R e s o u r c e   C a n d i d a t e s :   1 7  
+ A l t e r n a t e F o r m   Q u a l i f i e r s :   U N P L A T E D  
+ S c a l e   Q u a l i f i e r s :   1 0 0  
+ T a r g e t S i z e   Q u a l i f i e r s :   2 5 6 , 1 6 , 2 4 , 3 2 , 4 8  
+  
+  
+ R e s o u r c e   F i l e :   r e s o u r c e s . s c a l e - 1 2 5 . p r i  
+ V e r s i o n :   1 . 0  
+ R e s o u r c e   C a n d i d a t e s :   3  
+ S c a l e   Q u a l i f i e r s :   1 2 5  
+  
+ R e s o u r c e   F i l e :   r e s o u r c e s . s c a l e - 1 5 0 . p r i  
+ V e r s i o n :   1 . 0  
+ R e s o u r c e   C a n d i d a t e s :   3  
+ S c a l e   Q u a l i f i e r s :   1 5 0  
+  
+ R e s o u r c e   F i l e :   r e s o u r c e s . s c a l e - 2 0 0 . p r i  
+ V e r s i o n :   1 . 0  
+ R e s o u r c e   C a n d i d a t e s :   3  
+ S c a l e   Q u a l i f i e r s :   2 0 0  
+  
+ R e s o u r c e   F i l e :   r e s o u r c e s . s c a l e - 4 0 0 . p r i  
+ V e r s i o n :   1 . 0  
+ R e s o u r c e   C a n d i d a t e s :   3  
+ S c a l e   Q u a l i f i e r s :   4 0 0  
+ S u c c e s s f u l l y   C o m p l e t e d  
+ [build] C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\makeappx.exe pack /d D:\a\OgnelissShare\OgnelissShare\build\msix\layout /p D:\a\OgnelissShare\OgnelissShare\dist\ogneliss-share-0.1.1-windows-x64.msix /o
+Microsoft (R) MakeAppx Tool
+Version 10.0.26100.9457
+Copyright (C) Microsoft. All rights reserved.
+
+The path (/p) parameter is: "\\?\D:\a\OgnelissShare\OgnelissShare\dist\ogneliss-share-0.1.1-windows-x64.msix"
+The content directory (/d) parameter is: "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout"
+Enumerating files from directory "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout"
+Packing 50 file(s) in "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout" (content directory) to "\\?\D:\a\OgnelissShare\OgnelissShare\dist\ogneliss-share-0.1.1-windows-x64.msix" (output file name).
+Memory limit defaulting to 8587180032 bytes.
+Using "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\AppxManifest.xml" as the manifest for the package.
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\icudtl.dat" as a payload file.  Its path in the package will be "data\icudtl.dat".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\flutter_windows.dll" as a payload file.  Its path in the package will be "flutter_windows.dll".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\flutter_assets\assets\brand\mark.png" as a payload file.  Its path in the package will be "data\flutter_assets\assets\brand\mark.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\flutter_assets\assets\licenses\rust.json" as a payload file.  Its path in the package will be "data\flutter_assets\assets\licenses\rust.json".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square150x150Logo.scale-125.png" as a payload file.  Its path in the package will be "Assets\Square150x150Logo.scale-125.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square150x150Logo.scale-100.png" as a payload file.  Its path in the package will be "Assets\Square150x150Logo.scale-100.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square150x150Logo.png" as a payload file.  Its path in the package will be "Assets\Square150x150Logo.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square150x150Logo.scale-200.png" as a payload file.  Its path in the package will be "Assets\Square150x150Logo.scale-200.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square150x150Logo.scale-150.png" as a payload file.  Its path in the package will be "Assets\Square150x150Logo.scale-150.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square150x150Logo.scale-400.png" as a payload file.  Its path in the package will be "Assets\Square150x150Logo.scale-400.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.scale-400.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.scale-400.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.targetsize-16.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.targetsize-16.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.targetsize-16_altform-unplated.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.targetsize-16_altform-unplated.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.targetsize-24.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.targetsize-24.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.targetsize-24_altform-unplated.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.targetsize-24_altform-unplated.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.scale-200.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.scale-200.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.scale-125.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.scale-125.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.scale-100.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.scale-100.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.scale-150.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.scale-150.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.targetsize-48_altform-unplated.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.targetsize-48_altform-unplated.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\StoreLogo.png" as a payload file.  Its path in the package will be "Assets\StoreLogo.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.targetsize-32_altform-unplated.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.targetsize-32_altform-unplated.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.targetsize-256_altform-unplated.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.targetsize-256_altform-unplated.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.targetsize-32.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.targetsize-32.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.targetsize-48.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.targetsize-48.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\Square44x44Logo.targetsize-256.png" as a payload file.  Its path in the package will be "Assets\Square44x44Logo.targetsize-256.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\StoreLogo.scale-150.png" as a payload file.  Its path in the package will be "Assets\StoreLogo.scale-150.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\StoreLogo.scale-125.png" as a payload file.  Its path in the package will be "Assets\StoreLogo.scale-125.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\StoreLogo.scale-100.png" as a payload file.  Its path in the package will be "Assets\StoreLogo.scale-100.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\StoreLogo.scale-400.png" as a payload file.  Its path in the package will be "Assets\StoreLogo.scale-400.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\Assets\StoreLogo.scale-200.png" as a payload file.  Its path in the package will be "Assets\StoreLogo.scale-200.png".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\ogneliss_core.dll" as a payload file.  Its path in the package will be "ogneliss_core.dll".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\flutter_assets\NativeAssetsManifest.json" as a payload file.  Its path in the package will be "data\flutter_assets\NativeAssetsManifest.json".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\app.so" as a payload file.  Its path in the package will be "data\app.so".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\flutter_assets\FontManifest.json" as a payload file.  Its path in the package will be "data\flutter_assets\FontManifest.json".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\flutter_assets\NOTICES.Z" as a payload file.  Its path in the package will be "data\flutter_assets\NOTICES.Z".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\flutter_assets\AssetManifest.bin" as a payload file.  Its path in the package will be "data\flutter_assets\AssetManifest.bin".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\flutter_assets\shaders\stretch_effect.frag" as a payload file.  Its path in the package will be "data\flutter_assets\shaders\stretch_effect.frag".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\flutter_assets\shaders\ink_sparkle.frag" as a payload file.  Its path in the package will be "data\flutter_assets\shaders\ink_sparkle.frag".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\data\flutter_assets\fonts\MaterialIcons-Regular.otf" as a payload file.  Its path in the package will be "data\flutter_assets\fonts\MaterialIcons-Regular.otf".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\dartjni.dll" as a payload file.  Its path in the package will be "dartjni.dll".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\url_launcher_windows_plugin.dll" as a payload file.  Its path in the package will be "url_launcher_windows_plugin.dll".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\ogneliss_share.exe" as a payload file.  Its path in the package will be "ogneliss_share.exe".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\resources.pri" as a payload file.  Its path in the package will be "resources.pri".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\resources.scale-125.pri" as a payload file.  Its path in the package will be "resources.scale-125.pri".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\resources.scale-150.pri" as a payload file.  Its path in the package will be "resources.scale-150.pri".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\resources.scale-200.pri" as a payload file.  Its path in the package will be "resources.scale-200.pri".
+Processing "\\?\D:\a\OgnelissShare\OgnelissShare\build\msix\layout\resources.scale-400.pri" as a payload file.  Its path in the package will be "resources.scale-400.pri".
+Package creation succeeded.
+[build] готово:
+[build]   dist\ogneliss-share-0.1.1-windows-x64.zip  (16.3 МБ)
+[build]   dist\ogneliss-share-0.1.1-windows-x64.msix  (17.1 МБ)

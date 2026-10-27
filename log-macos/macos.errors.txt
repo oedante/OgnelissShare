@@ -1,0 +1,1 @@
+229:This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.

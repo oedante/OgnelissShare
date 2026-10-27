@@ -1,0 +1,16 @@
+
+::group::✅ Passing tests
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/widget_test.dart: окно с полученным текстом (ru)
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/format_test.dart: русский размеры
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/format_test.dart: русский множественное число
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/format_test.dart: русский имена передачи
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/format_test.dart: русский время
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/format_test.dart: русский ошибки и пустые имена
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/format_test.dart: english
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/format_test.dart: язык по системе
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/format_test.dart: снимок состояния разбирается
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/widget_test.dart: окно с полученным текстом (en)
+✅ /home/runner/work/OgnelissShare/OgnelissShare/test/widget_test.dart: значок устройства
+::endgroup::
+
+🎉 11 tests passed.
