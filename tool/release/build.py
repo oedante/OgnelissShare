@@ -189,7 +189,7 @@ def build_msix(ver, release_dir):
     }
     for k, v in values.items():
         manifest = manifest.replace('{{' + k + '}}', escape(v, {'"': '&quot;'}))
-    if '{{' in manifest:
+    if re.search(r'\{\{[A-Z_]+\}\}', manifest):
         sys.exit('В AppxManifest.xml остались незаполненные {{…}}')
     (layout / 'AppxManifest.xml').write_text(manifest, encoding='utf-8')
 

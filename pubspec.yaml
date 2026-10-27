@@ -1,7 +1,7 @@
 name: ogneliss_share
 description: "Ogneliss Share — прямая передача файлов между своими устройствами без учётных записей"
 publish_to: "none"
-version: 0.1.0+1
+version: 0.1.1+2
 
 environment:
   # Dart 3.10+ и Flutter 3.38+: этого требует file_picker 13.

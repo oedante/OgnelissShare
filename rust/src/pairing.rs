@@ -2,7 +2,8 @@
 //!
 //! Формат: `ogshare://pair?v=1&m=p&id=<ключ>&t=<секрет>&n=<имя>&p=<платформа>&r=<ретранслятор>&a=<адреса>`
 //!
-//! - `m` — `p` (постоянная связь «мои устройства»), `o` (разовый обмен) или
+//! - `m` — `p` (постоянная связь «Мои устройства»), `c` (постоянная связь
+//!   «Чужие устройства»: передачи подтверждаются), `o` (разовый обмен) или
 //!   `f` (файлы по ссылке: разовый обмен, файлы приходят сами);
 //! - `id` — открытый ключ пригласившего устройства (z-base-32);
 //! - `t` — секрет из 16 случайных байт;
@@ -37,6 +38,9 @@ const MARKERS: &[&str] = &[SCHEME, "ogneliss.ru/share/join/#", "ogneliss.ru/shar
 pub enum PairMode {
     /// Постоянная связь: устройство попадает в «Мои устройства».
     Pair,
+    /// Постоянная связь с чужим устройством: «Чужие устройства», каждую
+    /// передачу файлов получатель подтверждает.
+    Other,
     /// Разовый обмен: временная связь на один сеанс.
     Once,
     /// Файлы по ссылке: разовый обмен, пригласивший сразу отправляет файлы.
@@ -47,6 +51,7 @@ impl PairMode {
     pub fn as_str(self) -> &'static str {
         match self {
             PairMode::Pair => "pair",
+            PairMode::Other => "other",
             PairMode::Once => "once",
             PairMode::Files => "files",
         }
@@ -55,15 +60,22 @@ impl PairMode {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "pair" | "p" => Some(PairMode::Pair),
+            "other" | "c" => Some(PairMode::Other),
             "once" | "o" => Some(PairMode::Once),
             "files" | "f" => Some(PairMode::Files),
             _ => None,
         }
     }
 
+    /// Связь сохраняется (мои или чужие устройства), а не на один сеанс.
+    pub fn is_lasting(self) -> bool {
+        matches!(self, PairMode::Pair | PairMode::Other)
+    }
+
     fn letter(self) -> &'static str {
         match self {
             PairMode::Pair => "p",
+            PairMode::Other => "c",
             PairMode::Once => "o",
             PairMode::Files => "f",
         }

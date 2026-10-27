@@ -2,8 +2,9 @@
 //!
 //! - `identity.key` — 32 байта секретного ключа Ed25519. Создаётся при первом
 //!   запуске и никуда не передаётся; открытый ключ из него — адрес устройства.
-//! - `state.json` — имя устройства, «Мои устройства» и действующие ссылки-
-//!   приглашения (с их секретами, поэтому доступ — только владельцу).
+//! - `state.json` — имя устройства, «Мои устройства» и «Чужие устройства»,
+//!   действующие ссылки-приглашения (с их секретами, поэтому доступ — только
+//!   владельцу).
 //!   Записывается атомарно (временный файл и переименование), чтобы сбой не
 //!   испортил список.
 
@@ -17,6 +18,35 @@ use serde::{Deserialize, Serialize};
 
 const KEY_FILE: &str = "identity.key";
 const STATE_FILE: &str = "state.json";
+
+/// Насколько доверяем связанному устройству — решает каждая сторона сама.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Trust {
+    /// «Мои устройства»: файлы принимаются без вопросов.
+    #[default]
+    Mine,
+    /// «Чужие устройства»: связь постоянная, но каждую передачу файлов
+    /// получатель подтверждает.
+    Other,
+}
+
+impl Trust {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Trust::Mine => "mine",
+            Trust::Other => "other",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "mine" => Some(Trust::Mine),
+            "other" => Some(Trust::Other),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PeerRecord {
@@ -35,6 +65,10 @@ pub struct PeerRecord {
     /// пустое — имя, которое сообщает само устройство.
     #[serde(default)]
     pub alias: String,
+    /// Группа: мои или чужие устройства. В прежних версиях все связанные
+    /// устройства были «моими» — так и читаются.
+    #[serde(default)]
+    pub trust: Trust,
 }
 
 impl PeerRecord {
@@ -49,7 +83,8 @@ impl PeerRecord {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LinkInvite {
     pub id: String,
-    /// pair — «Моё устройство», once — разовый обмен, files — файлы по ссылке.
+    /// pair — «Моё устройство», other — «Чужое устройство», once — разовый
+    /// обмен, files — файлы по ссылке.
     pub mode: String,
     /// Секрет ссылки (base32).
     pub token: String,
@@ -185,6 +220,7 @@ mod tests {
                 last_seen: 2,
                 addr: Some(EndpointAddr::new(peer)),
                 alias: "Телефон мамы".into(),
+                trust: Trust::Other,
             }],
             invites: vec![LinkInvite {
                 id: "a1".into(),
@@ -203,11 +239,17 @@ mod tests {
         assert_eq!(back.peers.len(), 1);
         assert_eq!(back.peers[0].id, peer);
         assert_eq!(back.peers[0].display_name(), "Телефон мамы");
+        assert_eq!(back.peers[0].trust, Trust::Other);
         assert_eq!(back.invites.len(), 1);
         assert_eq!(back.invites[0].files, vec![PathBuf::from("/tmp/a.txt")]);
-        // Старый файл без новых полей читается.
-        fs::write(dir.join(STATE_FILE), br#"{"name":"x","peers":[]}"#).unwrap();
-        assert!(store.load_state().invites.is_empty());
+        // Старый файл без новых полей читается; прежние устройства — «мои».
+        let old = format!(
+            r#"{{"name":"x","peers":[{{"id":"{peer}","name":"n","platform":"ios","added":1}}]}}"#
+        );
+        fs::write(dir.join(STATE_FILE), old).unwrap();
+        let back = store.load_state();
+        assert!(back.invites.is_empty());
+        assert_eq!(back.peers[0].trust, Trust::Mine);
 
         fs::write(dir.join(STATE_FILE), b"{oops").unwrap();
         assert!(store.load_state().peers.is_empty());
