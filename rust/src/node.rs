@@ -1,5 +1,5 @@
-//! Узел Ogneliss Share: соединения, «Мои устройства», сопряжение по QR,
-//! присутствие в сети.
+//! Узел Ogneliss Share: соединения, «Мои устройства» и «Чужие устройства»,
+//! сопряжение по QR-коду и ссылке, присутствие в сети.
 //!
 //! Главное правило безопасности: входящее соединение принимается, только
 //! если ключ собеседника есть в списке связанных устройств или разовых
@@ -32,7 +32,7 @@ use tokio_util::sync::CancellationToken;
 use crate::events::Events;
 use crate::pairing::{PairLink, PairMode, decode_token, encode_token, pair_code};
 use crate::proto::{ALPN, CODE_BUSY, CODE_NOT_PAIRED, CODE_REMOVED, Msg, read_msg, write_msg};
-use crate::store::{LinkInvite, PeerRecord, Saved, Store};
+use crate::store::{LinkInvite, PeerRecord, Saved, Store, Trust};
 use crate::transfer::{Transfer, display_name};
 use crate::util::{clean_name, clean_platform, ct_eq, now_unix, random_id, short_code};
 
@@ -189,9 +189,22 @@ impl Drop for GuestSlot<'_> {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Kind {
     /// «Мои устройства»: постоянная связь, файлы принимаются без вопросов.
-    Paired,
-    /// Разовый обмен: каждую передачу файлов получатель подтверждает.
+    Mine,
+    /// «Чужие устройства»: постоянная связь, каждую передачу файлов
+    /// получатель подтверждает.
+    Other,
+    /// Разовый обмен: временная связь, передачи тоже подтверждаются.
     Session,
+}
+
+impl Kind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Kind::Mine => "mine",
+            Kind::Other => "other",
+            Kind::Session => "session",
+        }
+    }
 }
 
 #[derive(Default)]
@@ -237,6 +250,8 @@ pub(crate) struct Joined {
 
 pub(crate) struct PairRequest {
     pub id: String,
+    /// pair — в «Мои устройства», other — в «Чужие устройства».
+    pub mode: PairMode,
     pub peer: EndpointId,
     pub name: String,
     pub platform: String,
@@ -275,8 +290,11 @@ pub(crate) struct State {
 
 impl State {
     pub fn kind(&self, id: &EndpointId) -> Option<Kind> {
-        if self.saved.peers.iter().any(|p| &p.id == id) {
-            Some(Kind::Paired)
+        if let Some(p) = self.saved.peers.iter().find(|p| &p.id == id) {
+            Some(match p.trust {
+                Trust::Mine => Kind::Mine,
+                Trust::Other => Kind::Other,
+            })
         } else if self.sessions.contains_key(id) {
             Some(Kind::Session)
         } else {
@@ -985,7 +1003,8 @@ impl Node {
 
     // ------------------------------------------------------------ сопряжение
 
-    /// Показать QR-код: постоянная связь («pair») или разовый обмен («once»).
+    /// Показать QR-код: «Моё устройство» (pair), «Чужое устройство» (other)
+    /// или разовый обмен (once).
     pub fn create_invite(&self, mode: PairMode) -> Value {
         let token: [u8; 16] = rand::random();
         let expires = Instant::now() + INVITE_TTL;
@@ -1262,7 +1281,8 @@ impl Node {
             Msg::PairOk { name, platform } => {
                 let name = clean_name(&name);
                 match link.mode {
-                    PairMode::Pair => self.add_paired(link.id, &name, &platform),
+                    PairMode::Pair => self.add_peer(link.id, &name, &platform, Trust::Mine),
+                    PairMode::Other => self.add_peer(link.id, &name, &platform, Trust::Other),
                     PairMode::Once | PairMode::Files => self.add_session(link.id, &name, &platform),
                 }
                 self.adopt(conn.clone());
@@ -1318,7 +1338,7 @@ impl Node {
                 inv.joined = Some(Joined {
                     name: name.clone(),
                     platform: platform.clone(),
-                    state: if inv.mode == PairMode::Pair { "pending" } else { "done" },
+                    state: if inv.mode.is_lasting() { "pending" } else { "done" },
                 });
                 return Some(Ticket::Qr { mode: inv.mode, token: inv.token });
             }
@@ -1352,10 +1372,13 @@ impl Node {
             Ticket::Link { mode, token, .. } => (*mode, *token, true),
         };
 
-        // Some(true) — подключаем, Some(false) — отказ, None — не дождались.
+        // Постоянную связь (мои и чужие устройства) подтверждает владелец
+        // кода или ссылки; разовый обмен — нет: там подтверждается каждая
+        // передача. Some(true) — подключаем, Some(false) — отказ, None — не
+        // дождались.
         let decision = match mode {
             PairMode::Once | PairMode::Files => Some(true),
-            PairMode::Pair => {
+            PairMode::Pair | PairMode::Other => {
                 let code = pair_code(&self.id(), &peer, &tok);
                 let ttl = if via_link { LINK_DECISION_TTL } else { PAIR_DECISION_TTL };
                 let (tx, rx) = oneshot::channel();
@@ -1363,6 +1386,7 @@ impl Node {
                 self.with(|s| {
                     s.pair_requests.push(PairRequest {
                         id: req_id.clone(),
+                        mode,
                         peer,
                         name: name.clone(),
                         platform: platform.clone(),
@@ -1376,6 +1400,7 @@ impl Node {
                 self.events.emit(json!({
                     "type": "pair_request", "id": req_id, "peer": peer.to_string(),
                     "name": name, "platform": platform, "code": code, "via_link": via_link,
+                    "mode": mode.as_str(),
                 }));
                 let decision = tokio::select! {
                     r = timeout(ttl, rx) => match r {
@@ -1430,7 +1455,8 @@ impl Node {
         }
 
         match mode {
-            PairMode::Pair => self.add_paired(peer, &name, &platform),
+            PairMode::Pair => self.add_peer(peer, &name, &platform, Trust::Mine),
+            PairMode::Other => self.add_peer(peer, &name, &platform, Trust::Other),
             PairMode::Once | PairMode::Files => self.add_session(peer, &name, &platform),
         }
         if !via_link {
@@ -1472,7 +1498,9 @@ impl Node {
         }
     }
 
-    fn add_paired(&self, id: EndpointId, name: &str, platform: &str) {
+    /// Постоянная связь: в «Мои» или «Чужие устройства». Если устройство
+    /// уже в списке, группа — по последнему сопряжению.
+    fn add_peer(&self, id: EndpointId, name: &str, platform: &str, trust: Trust) {
         let now = now_unix();
         self.with(|s| {
             s.sessions.remove(&id);
@@ -1481,6 +1509,7 @@ impl Node {
                     p.name = clean_name(name);
                     p.platform = clean_platform(platform);
                     p.last_seen = now;
+                    p.trust = trust;
                 }
                 None => s.saved.peers.push(PeerRecord {
                     id,
@@ -1490,6 +1519,7 @@ impl Node {
                     last_seen: now,
                     addr: None,
                     alias: String::new(),
+                    trust,
                 }),
             }
         });
@@ -1498,10 +1528,28 @@ impl Node {
         self.events.changed();
     }
 
+    /// Перенести связанное устройство в другую группу. Решение только этой
+    /// стороны: от «моих» файлы принимаются сами, от «чужих» — после вопроса.
+    pub fn set_trust(&self, id: &EndpointId, trust: Trust) -> Result<()> {
+        let found = self.with(|s| match s.saved.peers.iter_mut().find(|p| &p.id == id) {
+            Some(p) => {
+                p.trust = trust;
+                true
+            }
+            None => false,
+        });
+        if !found {
+            bail!("not_found");
+        }
+        self.save();
+        self.events.changed();
+        Ok(())
+    }
+
     fn add_session(&self, id: EndpointId, name: &str, platform: &str) {
         self.with(|s| {
             if s.saved.peers.iter().any(|p| p.id == id) {
-                return; // уже среди «Моих устройств»
+                return; // уже среди связанных устройств
             }
             s.sessions.insert(
                 id,
@@ -1587,7 +1635,7 @@ impl Node {
                     "own_name": p.name,
                     "renamed": !p.alias.is_empty(),
                     "platform": p.platform,
-                    "kind": "paired",
+                    "kind": p.trust.as_str(),
                     "online": online,
                     "connecting": dialing && !online,
                     "last_seen": p.last_seen,
@@ -1617,7 +1665,7 @@ impl Node {
                     json!({
                         "id": r.id, "kind": "pair", "peer": r.peer.to_string(),
                         "name": r.name, "platform": r.platform, "code": r.code,
-                        "via_link": r.via_link,
+                        "via_link": r.via_link, "mode": r.mode.as_str(),
                     })
                 })
                 .collect();

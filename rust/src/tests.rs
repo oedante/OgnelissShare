@@ -98,8 +98,8 @@ async fn pair(a: &Arc<Node>, b: &Arc<Node>) {
     assert_eq!(res["ok"], true, "{res}");
     let (ida, idb) = (a.id().to_string(), b.id().to_string());
     wait_for("оба на связи", 10, || {
-        peer_ids(a).iter().any(|p| p.0 == idb && p.1 == "paired" && p.2)
-            && peer_ids(b).iter().any(|p| p.0 == ida && p.1 == "paired" && p.2)
+        peer_ids(a).iter().any(|p| p.0 == idb && p.1 == "mine" && p.2)
+            && peer_ids(b).iter().any(|p| p.0 == ida && p.1 == "mine" && p.2)
     })
     .await;
 }
@@ -365,7 +365,7 @@ async fn message_link_pairs_after_confirmation() {
     let r = join_result(&b, "итог B").await;
     assert_eq!(r["ok"], true, "{r}");
     let idb = b.id().to_string();
-    wait_for("связаны", 10, || peer_ids(&a).iter().any(|p| p.0 == idb && p.1 == "paired")).await;
+    wait_for("связаны", 10, || peer_ids(&a).iter().any(|p| p.0 == idb && p.1 == "mine")).await;
     assert!(a.snapshot()["links"].as_array().unwrap().is_empty(), "ссылка одноразовая");
 
     // Повторно по израсходованной ссылке не войти.

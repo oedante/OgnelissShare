@@ -18,6 +18,7 @@ use tokio::runtime::Runtime;
 
 use crate::node::{Config, Node, Relays, VERSION, error_code};
 use crate::pairing::PairMode;
+use crate::store::Trust;
 
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 static NODE: Mutex<Option<Arc<Node>>> = Mutex::new(None);
@@ -104,7 +105,7 @@ fn dispatch(v: &Value) -> Result<Value> {
         }
         "create_invite" => {
             let mode = match PairMode::parse(str_arg(v, "mode")?) {
-                Some(m @ (PairMode::Pair | PairMode::Once)) => m,
+                Some(m @ (PairMode::Pair | PairMode::Other | PairMode::Once)) => m,
                 _ => bail!("bad_request"),
             };
             Ok(node.create_invite(mode))
@@ -120,6 +121,11 @@ fn dispatch(v: &Value) -> Result<Value> {
         }
         "rename_peer" => {
             node.rename_peer(&peer_arg(v)?, str_arg(v, "name")?)?;
+            ok()
+        }
+        "set_trust" => {
+            let trust = Trust::parse(str_arg(v, "trust")?).ok_or_else(|| anyhow!("bad_request"))?;
+            node.set_trust(&peer_arg(v)?, trust)?;
             ok()
         }
         "cancel_invite" => {
