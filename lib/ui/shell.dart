@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/icons.dart';
 import '../app/app_model.dart';
 import '../app/format.dart';
 import '../core/models.dart';
@@ -292,7 +293,7 @@ class TextDialog extends StatelessWidget {
             Navigator.of(context).pop();
             showSnack(tr.copied, duration: const Duration(seconds: 2));
           },
-          icon: const Icon(Icons.copy_rounded),
+          icon: const Icon(AppIcons.content_copy),
           label: Text(tr.copy),
         ),
       ],

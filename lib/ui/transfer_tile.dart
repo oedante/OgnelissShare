@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/icons.dart';
 import '../app/app_model.dart';
 import '../app/format.dart';
 import '../app/theme.dart';
@@ -64,11 +65,11 @@ class TransferTile extends StatelessWidget {
     final failed = item.status == 'failed' || item.status == 'declined';
     final IconData icon;
     if (item.isText) {
-      icon = Icons.notes_rounded;
+      icon = AppIcons.notes;
     } else if (item.outgoing) {
-      icon = Icons.north_east_rounded;
+      icon = AppIcons.north_east;
     } else {
-      icon = Icons.south_west_rounded;
+      icon = AppIcons.south_west;
     }
     final Color iconColor;
     if (failed) {
@@ -139,7 +140,7 @@ class TransferTile extends StatelessWidget {
     if (item.isActive) {
       out.add(IconButton(
         tooltip: tr.cancel,
-        icon: const Icon(Icons.close_rounded),
+        icon: const Icon(AppIcons.close),
         onPressed: () => model.cancelTransfer(item.id),
       ));
       return out;
@@ -147,7 +148,7 @@ class TransferTile extends StatelessWidget {
     if (item.canRetry) {
       out.add(IconButton(
         tooltip: tr.retry,
-        icon: const Icon(Icons.refresh_rounded),
+        icon: const Icon(AppIcons.refresh),
         onPressed: () async {
           try {
             await model.retryTransfer(item.id);
@@ -160,19 +161,19 @@ class TransferTile extends StatelessWidget {
     if (!item.outgoing && item.isDone && item.isText) {
       out.add(IconButton(
         tooltip: tr.copy,
-        icon: const Icon(Icons.copy_rounded),
+        icon: const Icon(AppIcons.content_copy),
         onPressed: () => _copyText(model),
       ));
     } else if (!item.outgoing && item.isDone && item.savedTo != null) {
       out.add(IconButton(
         tooltip: item.savedIsDir ? tr.openFolder : tr.open,
-        icon: Icon(item.savedIsDir ? Icons.folder_open_rounded : Icons.open_in_new_rounded),
+        icon: Icon(item.savedIsDir ? AppIcons.folder_open : AppIcons.open_in_new),
         onPressed: () => Files.open(item.savedTo!),
       ));
     }
     out.add(IconButton(
       tooltip: tr.close,
-      icon: const Icon(Icons.clear_rounded, size: 20),
+      icon: const Icon(AppIcons.clear, size: 20),
       onPressed: () => model.dismissTransfer(item.id),
     ));
     return out;

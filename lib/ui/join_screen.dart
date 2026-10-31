@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../app/icons.dart';
 import '../app/app_model.dart';
 import '../app/theme.dart';
 import '../core/models.dart';
@@ -118,7 +119,7 @@ class _JoinScreenState extends State<JoinScreen> {
     } else if (_ok == true) {
       status = Column(
         children: [
-          const Icon(Icons.check_circle_rounded, size: 64, color: Brand.ok),
+          const Icon(AppIcons.check_circle, size: 64, color: Brand.ok),
           const SizedBox(height: 16),
           Text(
             info.files
@@ -137,7 +138,7 @@ class _JoinScreenState extends State<JoinScreen> {
     } else {
       status = Column(
         children: [
-          Icon(Icons.error_outline_rounded, size: 64, color: theme.colorScheme.error),
+          Icon(AppIcons.error, size: 64, color: theme.colorScheme.error),
           const SizedBox(height: 16),
           Text(tr.error(_error), textAlign: TextAlign.center, style: theme.textTheme.titleMedium),
           const SizedBox(height: 24),

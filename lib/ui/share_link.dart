@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../app/icons.dart';
 import '../app/app_model.dart';
 import '../app/format.dart';
 import '../core/models.dart';
@@ -34,6 +35,8 @@ Future<void> shareLink(BuildContext context, LinkItem link) async {
   await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    useSafeArea: true,
+    useRootNavigator: true,
     builder: (_) => _LinkSheet(link: link, text: text),
   );
 }
@@ -107,17 +110,17 @@ class _LinkSheet extends StatelessWidget {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.content_copy_rounded),
+              leading: const Icon(AppIcons.content_copy),
               title: Text(tr.copyMessage),
               onTap: () => _copy(context, text),
             ),
             ListTile(
-              leading: const Icon(Icons.link_rounded),
+              leading: const Icon(AppIcons.link),
               title: Text(tr.copyLink),
               onTap: () => _copy(context, link.url),
             ),
             ListTile(
-              leading: const Icon(Icons.mail_outline_rounded),
+              leading: const Icon(AppIcons.mail),
               title: Text(tr.sendByEmail),
               onTap: () => _email(context),
             ),

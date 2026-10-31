@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../app/icons.dart';
 import '../app/app_model.dart';
 import '../app/format.dart';
 import '../core/models.dart';
@@ -63,17 +64,17 @@ class HomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: canScan ? tr.scanCode : tr.pasteLink,
-            icon: Icon(canScan ? Icons.qr_code_scanner_rounded : Icons.link_rounded),
+            icon: Icon(canScan ? AppIcons.qr_code_scanner : AppIcons.link),
             onPressed: () => openScan(context),
           ),
           IconButton(
             tooltip: tr.filesByLink,
-            icon: const Icon(Icons.add_link_rounded),
+            icon: const Icon(AppIcons.add_link),
             onPressed: () => filesByLink(context),
           ),
           IconButton(
             tooltip: tr.settings,
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(AppIcons.settings),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
             ),
@@ -85,7 +86,7 @@ class HomeScreen extends StatelessWidget {
           ? null
           : FloatingActionButton.extended(
               onPressed: () => openAdd(context),
-              icon: const Icon(Icons.qr_code_2_rounded),
+              icon: const Icon(AppIcons.qr_code_2),
               label: Text(tr.addDevice),
             ),
       body: ListView(
@@ -116,7 +117,6 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         for (var i = 0; i < snap.links.length; i++) ...[
-                          if (i > 0) const Divider(height: 1, indent: 72),
                           _LinkTile(key: ValueKey(snap.links[i].id), link: snap.links[i]),
                         ],
                       ],
@@ -150,7 +150,7 @@ Widget? _sendAll(BuildContext context, String group, List<Peer> peers) {
   if (peers.length < 2) return null;
   return TextButton.icon(
     onPressed: () => showGroupSendSheet(context, group, peers),
-    icon: const Icon(Icons.send_rounded, size: 18),
+    icon: const Icon(AppIcons.send, size: 18),
     label: Text(tr.sendAll),
   );
 }
@@ -183,7 +183,7 @@ class _MeCard extends StatelessWidget {
         ),
         trailing: IconButton(
           tooltip: tr.rename,
-          icon: const Icon(Icons.edit_outlined),
+          icon: const Icon(AppIcons.edit),
           onPressed: () => showRenameDialog(context, me.name),
         ),
       ),
@@ -251,12 +251,12 @@ class _EmptyDevices extends StatelessWidget {
                 children: [
                   FilledButton.icon(
                     onPressed: () => HomeScreen.openAdd(context),
-                    icon: const Icon(Icons.qr_code_2_rounded),
+                    icon: const Icon(AppIcons.qr_code_2),
                     label: Text(tr.showCode),
                   ),
                   OutlinedButton.icon(
                     onPressed: () => HomeScreen.openScan(context),
-                    icon: Icon(canScan ? Icons.qr_code_scanner_rounded : Icons.link_rounded),
+                    icon: Icon(canScan ? AppIcons.qr_code_scanner : AppIcons.link),
                     label: Text(canScan ? tr.scanCode : tr.pasteLink),
                   ),
                 ],
@@ -264,7 +264,7 @@ class _EmptyDevices extends StatelessWidget {
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: () => HomeScreen.filesByLink(context),
-                icon: const Icon(Icons.add_link_rounded),
+                icon: const Icon(AppIcons.add_link),
                 label: Text(tr.filesByLink),
               ),
             ],
@@ -287,7 +287,6 @@ class _DeviceGroup extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < peers.length; i++) ...[
-            if (i > 0) const Divider(height: 1, indent: 72),
             _DeviceTile(peer: peers[i]),
           ],
         ],
@@ -331,7 +330,7 @@ class _DeviceTile extends StatelessWidget {
       ),
       trailing: IconButton.filledTonal(
         tooltip: tr.send,
-        icon: const Icon(Icons.send_rounded),
+        icon: const Icon(AppIcons.send),
         onPressed: () => showSendSheet(context, peer),
       ),
       onTap: () => showSendSheet(context, peer),
@@ -359,10 +358,10 @@ class _LinkTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final IconData icon = switch (link.mode) {
-      'pair' => Icons.devices_rounded,
-      'other' => Icons.people_outline_rounded,
-      'files' => Icons.insert_drive_file_outlined,
-      _ => Icons.swap_horiz_rounded,
+      'pair' => AppIcons.devices,
+      'other' => AppIcons.group,
+      'files' => AppIcons.insert_drive_file,
+      _ => AppIcons.swap_horiz,
     };
     final String title = switch (link.mode) {
       'pair' => tr.linkPair,
@@ -391,12 +390,12 @@ class _LinkTile extends StatelessWidget {
         children: [
           IconButton(
             tooltip: tr.shareAgain,
-            icon: const Icon(Icons.send_rounded),
+            icon: const Icon(AppIcons.send),
             onPressed: () => shareLink(context, link),
           ),
           IconButton(
             tooltip: tr.revoke,
-            icon: const Icon(Icons.link_off_rounded),
+            icon: const Icon(AppIcons.link_off),
             onPressed: () => _revoke(context),
           ),
         ],

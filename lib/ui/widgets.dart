@@ -96,7 +96,8 @@ class Tag extends StatelessWidget {
   }
 }
 
-/// Заголовок раздела списка.
+/// Заголовок раздела списка — как в Ogneliss Mail: подпись основным
+/// (синим) цветом, обычным регистром, без полосы, вровень с текстом строк.
 class SectionHeader extends StatelessWidget {
   const SectionHeader(this.title, {super.key, this.trailing});
 
@@ -106,21 +107,24 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
+    return Semantics(
+      header: true,
+      child: Container(
+        margin: const EdgeInsets.only(top: Space.l, bottom: Space.xs),
+        constraints: const BoxConstraints(minHeight: 28),
+        padding: EdgeInsetsDirectional.fromSTEB(Space.l, 0, trailing == null ? Space.l : 0, 0),
+        alignment: AlignmentDirectional.centerStart,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w500),
               ),
             ),
-          ),
-          ?trailing,
-        ],
+            ?trailing,
+          ],
+        ),
       ),
     );
   }

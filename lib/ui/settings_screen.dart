@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../app/icons.dart';
 import '../app/app_model.dart';
 import '../core/native.dart';
 import '../platform/files.dart';
@@ -43,7 +44,7 @@ class SettingsScreen extends StatelessWidget {
                     leading: PeerAvatar(platform: me.platform, online: me.online),
                     title: Text(tr.deviceName(me.name)),
                     subtitle: Text(tr.deviceNameTitle),
-                    trailing: const Icon(Icons.edit_outlined),
+                    trailing: const Icon(AppIcons.edit),
                     onTap: () => showRenameDialog(context, me.name),
                   ),
                 ),
@@ -72,26 +73,25 @@ class SettingsScreen extends StatelessWidget {
                           applicationLegalese: tr.legalese,
                         ),
                       ),
-                      const Divider(height: 1),
                       ListTile(
-                        leading: const Icon(Icons.code_rounded),
+                        leading: const Icon(AppIcons.code),
                         title: Text(tr.sourceCode),
                         subtitle: const Text(_repoUrl),
                         onTap: () => launchUrl(Uri.parse(_repoUrl), mode: LaunchMode.externalApplication),
                       ),
                       ListTile(
-                        leading: const Icon(Icons.public_rounded),
+                        leading: const Icon(AppIcons.public),
                         title: Text(tr.website),
                         subtitle: const Text('ogneliss.ru'),
                         onTap: () => launchUrl(Uri.parse(_siteUrl), mode: LaunchMode.externalApplication),
                       ),
                       ListTile(
-                        leading: const Icon(Icons.hub_outlined),
+                        leading: const Icon(AppIcons.hub),
                         title: Text(tr.relay),
                         subtitle: Text(me.relay == 'n0' ? tr.relayPublic : me.relay),
                       ),
                       ListTile(
-                        leading: const Icon(Icons.receipt_long_outlined),
+                        leading: const Icon(AppIcons.receipt_long),
                         title: Text(tr.logs),
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(builder: (_) => const LogScreen()),
@@ -147,7 +147,7 @@ class _DownloadsTile extends StatelessWidget {
     final me = model.snapshot.me;
     if (!isDesktop) {
       return ListTile(
-        leading: const Icon(Icons.folder_outlined),
+        leading: const Icon(AppIcons.folder),
         title: Text(_mobileHint()),
         subtitle: Text(me.downloadDir, maxLines: 2, overflow: TextOverflow.ellipsis),
         onLongPress: () {
@@ -163,7 +163,7 @@ class _DownloadsTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.folder_outlined),
+              const Icon(AppIcons.folder),
               const SizedBox(width: 12),
               Expanded(child: SelectableText(me.downloadDir)),
             ],
@@ -175,7 +175,7 @@ class _DownloadsTile extends StatelessWidget {
             children: [
               OutlinedButton.icon(
                 onPressed: () => Files.open(me.downloadDir),
-                icon: const Icon(Icons.folder_open_rounded),
+                icon: const Icon(AppIcons.folder_open),
                 label: Text(tr.openFolder),
               ),
               OutlinedButton(onPressed: _change, child: Text(tr.change)),
@@ -220,7 +220,7 @@ class _LogScreenState extends State<LogScreen> {
         actions: [
           IconButton(
             tooltip: tr.copy,
-            icon: const Icon(Icons.copy_rounded),
+            icon: const Icon(AppIcons.content_copy),
             onPressed: () {
               Clipboard.setData(ClipboardData(text: text));
               showSnack(tr.copied, duration: const Duration(seconds: 2));

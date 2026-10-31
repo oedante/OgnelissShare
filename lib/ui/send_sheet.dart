@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/icons.dart';
 import '../app/app_model.dart';
 import '../app/format.dart';
 import '../core/models.dart';
@@ -21,6 +22,8 @@ Future<void> showSendSheet(BuildContext context, Peer peer) {
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    useSafeArea: true,
+    useRootNavigator: true,
     isScrollControlled: true,
     builder: (sheetContext) => _SendSheet(peer: peer),
   );
@@ -31,6 +34,8 @@ Future<void> showGroupSendSheet(BuildContext context, String group, List<Peer> p
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    useSafeArea: true,
+    useRootNavigator: true,
     isScrollControlled: true,
     builder: (sheetContext) => _GroupSheet(group: group, peers: peers),
   );
@@ -81,18 +86,18 @@ class _SendSheet extends StatelessWidget {
             const Divider(),
             if (!current.isSession)
               _Option(
-                icon: Icons.edit_outlined,
+                icon: AppIcons.edit,
                 label: tr.rename,
                 onTap: () => _rename(context, model, current),
               ),
             if (!current.isSession)
               _Option(
-                icon: current.isMine ? Icons.people_outline_rounded : Icons.devices_rounded,
+                icon: current.isMine ? AppIcons.group : AppIcons.devices,
                 label: current.isMine ? tr.moveToOther : tr.moveToMine,
                 onTap: () => _move(context, model, current),
               ),
             _Option(
-              icon: current.isSession ? Icons.link_off_rounded : Icons.delete_outline_rounded,
+              icon: current.isSession ? AppIcons.link_off : AppIcons.delete,
               label: current.isSession ? tr.endSession : tr.forget,
               danger: true,
               onTap: () => _forget(context, model, current),
@@ -123,7 +128,7 @@ class _GroupSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.groups_outlined)),
+              leading: const CircleAvatar(child: Icon(AppIcons.groups)),
               title: Text(tr.sendToGroup(group), style: theme.textTheme.titleMedium),
               subtitle: Text(
                 '${tr.groupDevices(peers.length)} · ${tr.online} $online',
@@ -148,29 +153,29 @@ class _GroupSheet extends StatelessWidget {
 /// устройству или всей группе.
 List<Widget> _sendOptions(BuildContext context, AppModel model, List<Peer> peers) => [
       _Option(
-        icon: Icons.insert_drive_file_outlined,
+        icon: AppIcons.insert_drive_file,
         label: tr.sendFiles,
         onTap: () => _pickAndSend(context, model, peers, media: false),
       ),
       if (isMobile)
         _Option(
-          icon: Icons.photo_library_outlined,
+          icon: AppIcons.photo_library,
           label: tr.sendMedia,
           onTap: () => _pickAndSend(context, model, peers, media: true),
         ),
       if (isDesktop)
         _Option(
-          icon: Icons.folder_outlined,
+          icon: AppIcons.folder,
           label: tr.sendFolder,
           onTap: () => _pickFolderAndSend(context, model, peers),
         ),
       _Option(
-        icon: Icons.notes_rounded,
+        icon: AppIcons.notes,
         label: tr.sendText,
         onTap: () => _composeText(context, model, peers),
       ),
       _Option(
-        icon: Icons.content_paste_rounded,
+        icon: AppIcons.content_paste,
         label: tr.sendClipboard,
         onTap: () => _sendClipboard(context, model, peers),
       ),
@@ -392,7 +397,7 @@ class _TextComposerState extends State<_TextComposer> {
             border: const OutlineInputBorder(),
             suffixIcon: IconButton(
               tooltip: tr.paste,
-              icon: const Icon(Icons.content_paste_rounded),
+              icon: const Icon(AppIcons.content_paste),
               onPressed: _paste,
             ),
           ),
@@ -411,6 +416,8 @@ Future<void> showShareTargetSheet(BuildContext context, SharedPayload payload) {
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    useSafeArea: true,
+    useRootNavigator: true,
     isScrollControlled: true,
     builder: (sheetContext) => _ShareTargets(payload: payload),
   );
@@ -446,7 +453,7 @@ class _ShareTargets extends StatelessWidget {
             ),
             if (payload.files.isNotEmpty)
               ListTile(
-                leading: const Icon(Icons.add_link_rounded),
+                leading: const Icon(AppIcons.add_link),
                 title: Text(tr.filesByLink),
                 subtitle: Text(tr.filesByLinkHint),
                 onTap: () {

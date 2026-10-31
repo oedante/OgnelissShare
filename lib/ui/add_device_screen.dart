@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../app/icons.dart';
 import '../app/app_model.dart';
 import '../app/format.dart';
 import '../app/theme.dart';
@@ -116,9 +117,9 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
               children: [
                 SegmentedButton<String>(
                   segments: [
-                    ButtonSegment(value: 'pair', icon: const Icon(Icons.devices_rounded), label: Text(tr.segMine)),
-                    ButtonSegment(value: 'other', icon: const Icon(Icons.people_outline_rounded), label: Text(tr.segOther)),
-                    ButtonSegment(value: 'once', icon: const Icon(Icons.swap_horiz_rounded), label: Text(tr.segOnce)),
+                    ButtonSegment(value: 'pair', icon: const Icon(AppIcons.devices), label: Text(tr.segMine)),
+                    ButtonSegment(value: 'other', icon: const Icon(AppIcons.group), label: Text(tr.segOther)),
+                    ButtonSegment(value: 'once', icon: const Icon(AppIcons.swap_horiz), label: Text(tr.segOnce)),
                   ],
                   selected: {_mode},
                   onSelectionChanged: (s) => _setMode(s.first),
@@ -148,7 +149,7 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
                     onPressed: () => Navigator.of(context).pushReplacement(
                       MaterialPageRoute<void>(builder: (_) => const ScanScreen()),
                     ),
-                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    icon: const Icon(AppIcons.qr_code_scanner),
                     label: Text(tr.scanCode),
                   ),
                 ],
@@ -213,7 +214,7 @@ class _QrCard extends StatelessWidget {
         // (отдельная, на сутки; QR-код при этом остаётся в силе).
         FilledButton.tonalIcon(
           onPressed: () => createAndShareLink(context, invite.mode),
-          icon: const Icon(Icons.send_rounded),
+          icon: const Icon(AppIcons.send),
           label: Text(tr.sendLink),
         ),
         const SizedBox(height: 8),
@@ -248,14 +249,14 @@ class _JoinedCard extends StatelessWidget {
         badge = const SizedBox(width: 40, height: 40, child: CircularProgressIndicator(strokeWidth: 3));
       case 'declined':
         text = tr.joinedDeclined(tr.deviceName(joined.name));
-        badge = Icon(Icons.block_rounded, size: 48, color: theme.colorScheme.error);
+        badge = Icon(AppIcons.block, size: 48, color: theme.colorScheme.error);
       default:
         text = switch (mode) {
           'once' => tr.joinedOnce(tr.deviceName(joined.name)),
           'other' => tr.joinedDoneOther(tr.deviceName(joined.name)),
           _ => tr.joinedDone(tr.deviceName(joined.name)),
         };
-        badge = const Icon(Icons.check_circle_rounded, size: 56, color: Brand.ok);
+        badge = const Icon(AppIcons.check_circle, size: 56, color: Brand.ok);
     }
     final finished = joined.state != 'pending';
     return Card(
@@ -300,13 +301,13 @@ class _ExpiredCard extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(Icons.timer_off_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
+            Icon(AppIcons.timer_off, size: 48, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 12),
             Text(tr.codeExpired, style: theme.textTheme.titleMedium),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: onNew,
-              icon: const Icon(Icons.refresh_rounded),
+              icon: const Icon(AppIcons.refresh),
               label: Text(tr.newCode),
             ),
           ],

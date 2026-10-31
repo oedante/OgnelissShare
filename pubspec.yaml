@@ -29,6 +29,8 @@ dependencies:
   # Открыть полученный файл на телефоне; на компьютере — url_launcher.
   open_filex: ^4.3.4
   url_launcher: ^6.3.1
+  # Значки — Material Symbols Rounded, как в Ogneliss Mail (один вид линейки).
+  material_symbols_icons: ^4.2719.3
 
 dev_dependencies:
   flutter_test:
@@ -42,3 +44,15 @@ flutter:
   assets:
     - assets/brand/mark.png
     - assets/licenses/rust.json
+    - assets/fonts/Roboto-LICENSE.txt
+  # Шрифт интерфейса — Roboto из приложения, как в Ogneliss Mail: одинаковый
+  # вид на Android, iPhone, Mac, Windows и Linux (Apache 2.0,
+  # assets/fonts/Roboto-LICENSE.txt).
+  fonts:
+    - family: AppRoboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../app/icons.dart';
 import '../app/app_model.dart';
 import '../core/native.dart';
 import '../platform/startup.dart';
@@ -177,7 +178,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       tooltip: tr.paste,
-                      icon: const Icon(Icons.content_paste_rounded),
+                      icon: const Icon(AppIcons.content_paste),
                       onPressed: _busy ? null : _paste,
                     ),
                   ),

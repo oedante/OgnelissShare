@@ -31,6 +31,8 @@ Stream<LicenseEntry> _rustLicenses() async* {
   for (final (packages, text) in entries) {
     yield LicenseEntryWithLineBreaks(packages, text);
   }
+  // Шрифт интерфейса — Roboto из приложения (assets/fonts).
+  yield LicenseEntryWithLineBreaks(const ['Roboto'], await rootBundle.loadString('assets/fonts/Roboto-LICENSE.txt'));
 }
 
 List<(List<String>, String)> _parseLicenses(String raw) {

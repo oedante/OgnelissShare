@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ogneliss_share/app/icons.dart';
 import 'package:ogneliss_share/app/theme.dart';
 import 'package:ogneliss_share/l10n/l10n.dart';
 import 'package:ogneliss_share/ui/shell.dart';
@@ -43,7 +44,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.phone_android), findsOneWidget);
+    expect(find.byIcon(AppIcons.phone_android), findsOneWidget);
     expect(find.text('AB12'), findsOneWidget);
   });
 }
