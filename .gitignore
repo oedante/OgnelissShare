@@ -48,3 +48,6 @@ __pycache__/
 *.mobileprovision
 *service-account*.json
 play-key*.json
+
+# Собранные страницы сайта (site/build_share_site.py)
+site/out/

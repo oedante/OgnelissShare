@@ -1,0 +1,10 @@
+<ru-RU>
+• «Чужие устройства»: связь с устройствами родных и коллег сохраняется, но каждую передачу файлов вы подтверждаете. Устройство можно перенести из «Моих» в «Чужие» и обратно
+• «Отправить всем» — файлы, текст или буфер обмена сразу на все устройства группы
+• «Буфер обмена» — отправить скопированный текст одним нажатием
+</ru-RU>
+<en-US>
+• Other people’s devices: devices of family and colleagues stay linked, but you confirm every transfer of files. A device can be moved between My devices and Other people’s devices
+• Send to all — files, text or the clipboard to every device of a group at once
+• Clipboard — send copied text with one tap
+</en-US>
