@@ -62,7 +62,7 @@ class Me {
   final String version;
 }
 
-/// Связанное устройство («Мои устройства») или разовый собеседник.
+/// Связанное устройство («Мои» или «Чужие устройства») или разовый собеседник.
 class Peer {
   const Peer({
     required this.id,
@@ -103,7 +103,8 @@ class Peer {
   final bool renamed;
   final String platform;
 
-  /// paired — постоянная связь; session — разовый обмен.
+  /// mine — «Мои устройства» (файлы принимаются сами), other — «Чужие
+  /// устройства» (передачи подтверждаются), session — разовый обмен.
   final String kind;
   final bool online;
   final bool connecting;
@@ -112,6 +113,8 @@ class Peer {
   final int lastSeen;
 
   bool get isSession => kind == 'session';
+  bool get isOther => kind == 'other';
+  bool get isMine => !isSession && !isOther;
 }
 
 /// Кто воспользовался показанным QR-кодом.
@@ -159,6 +162,7 @@ class Request {
     required this.total,
     required this.names,
     this.viaLink = false,
+    this.mode = '',
   });
 
   factory Request.fromJson(Map<String, dynamic> j) => Request(
@@ -172,6 +176,7 @@ class Request {
         total: _int(j['total']),
         names: _strings(j['names']),
         viaLink: _bool(j['via_link']),
+        mode: _str(j['mode']),
       );
 
   final String id;
@@ -190,6 +195,9 @@ class Request {
 
   /// Подключаются по ссылке из сообщения, а не по QR-коду рядом.
   final bool viaLink;
+
+  /// Для pair: pair — в «Мои устройства», other — в «Чужие».
+  final String mode;
 }
 
 /// Ссылка для почты или мессенджера: приглашение или файлы.
@@ -218,7 +226,8 @@ class LinkItem {
 
   final String id;
 
-  /// pair — «Моё устройство», once — разовый обмен, files — файлы по ссылке.
+  /// pair — «Моё устройство», other — «Чужое», once — разовый обмен,
+  /// files — файлы по ссылке.
   final String mode;
   final String url;
   final int created;

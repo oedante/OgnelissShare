@@ -76,7 +76,12 @@ fn peer_ids(node: &Node) -> Vec<(String, String, bool)> {
 
 /// Постоянное сопряжение: B сканирует код A, A подтверждает.
 async fn pair(a: &Arc<Node>, b: &Arc<Node>) {
-    let inv = a.create_invite(PairMode::Pair);
+    pair_as(a, b, PairMode::Pair).await;
+}
+
+async fn pair_as(a: &Arc<Node>, b: &Arc<Node>, mode: PairMode) {
+    let group = if mode == PairMode::Other { "other" } else { "mine" };
+    let inv = a.create_invite(mode);
     let info = b.use_invite(inv["uri"].as_str().unwrap()).unwrap();
     wait_for("запрос на сопряжение", 10, || {
         !a.snapshot()["requests"].as_array().unwrap().is_empty()
@@ -87,6 +92,7 @@ async fn pair(a: &Arc<Node>, b: &Arc<Node>) {
     assert_eq!(req["kind"], "pair");
     assert_eq!(req["code"], info["code"], "проверочные коды на двух экранах совпадают");
     assert_eq!(req["name"], b.name());
+    assert_eq!(req["mode"], mode.as_str());
     a.respond_pair(req["id"].as_str().unwrap(), true).unwrap();
     let mut ev = Vec::new();
     wait_for("итог сопряжения", 10, || {
@@ -98,10 +104,40 @@ async fn pair(a: &Arc<Node>, b: &Arc<Node>) {
     assert_eq!(res["ok"], true, "{res}");
     let (ida, idb) = (a.id().to_string(), b.id().to_string());
     wait_for("оба на связи", 10, || {
-        peer_ids(a).iter().any(|p| p.0 == idb && p.1 == "mine" && p.2)
-            && peer_ids(b).iter().any(|p| p.0 == ida && p.1 == "mine" && p.2)
+        peer_ids(a).iter().any(|p| p.0 == idb && p.1 == group && p.2)
+            && peer_ids(b).iter().any(|p| p.0 == ida && p.1 == group && p.2)
     })
     .await;
+}
+
+/// «Чужие устройства»: связь постоянная, но передачи подтверждаются;
+/// перенос в «Мои» — и файлы принимаются сами.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn other_devices_ask_and_can_be_moved() {
+    let (a, base_a) = make_node("A").await;
+    let (b, base_b) = make_node("B").await;
+    pair_as(&a, &b, PairMode::Other).await;
+
+    let src = base_b.join("src");
+    write_tree(&src);
+    let t1 = b.send_files(a.id(), vec![src.join("doc.txt")]).unwrap();
+    wait_for("вопрос «Принять?»", 10, || {
+        a.snapshot()["requests"].as_array().unwrap().iter().any(|r| r["kind"] == "offer")
+    })
+    .await;
+    let snap = a.snapshot();
+    let req = snap["requests"].as_array().unwrap().iter().find(|r| r["kind"] == "offer").unwrap();
+    a.respond_offer(req["transfer"].as_str().unwrap(), true).unwrap();
+    wait_for("приём", 10, || transfer(&b, &t1)["status"] == "done").await;
+
+    // Перенесли в «Мои» — следующая передача без вопроса.
+    a.set_trust(&b.id(), crate::store::Trust::Mine).unwrap();
+    assert_eq!(peer_ids(&a)[0].1, "mine");
+    std::fs::remove_file(base_a.join("dl/doc.txt")).unwrap();
+    let t2 = b.send_files(a.id(), vec![src.join("doc.txt")]).unwrap();
+    wait_for("приём без вопроса", 10, || transfer(&b, &t2)["status"] == "done").await;
+    assert!(base_a.join("dl/doc.txt").exists());
+    assert!(a.set_trust(&a.id(), crate::store::Trust::Other).is_err());
 }
 
 fn write_tree(root: &Path) {

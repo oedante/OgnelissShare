@@ -26,6 +26,16 @@ Future<void> showSendSheet(BuildContext context, Peer peer) {
   );
 }
 
+/// «Отправить всем» в группе устройств (мои, чужие).
+Future<void> showGroupSendSheet(BuildContext context, String group, List<Peer> peers) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (sheetContext) => _GroupSheet(group: group, peers: peers),
+  );
+}
+
 class _SendSheet extends StatelessWidget {
   const _SendSheet({required this.peer});
 
@@ -67,34 +77,19 @@ class _SendSheet extends StatelessWidget {
                 child: Text(tr.offlineNote, style: theme.textTheme.bodySmall),
               ),
             const Divider(),
-            _Option(
-              icon: Icons.insert_drive_file_outlined,
-              label: tr.sendFiles,
-              onTap: () => _pickAndSend(context, model, current, media: false),
-            ),
-            if (isMobile)
-              _Option(
-                icon: Icons.photo_library_outlined,
-                label: tr.sendMedia,
-                onTap: () => _pickAndSend(context, model, current, media: true),
-              ),
-            if (isDesktop)
-              _Option(
-                icon: Icons.folder_outlined,
-                label: tr.sendFolder,
-                onTap: () => _pickFolderAndSend(context, model, current),
-              ),
-            _Option(
-              icon: Icons.notes_rounded,
-              label: tr.sendText,
-              onTap: () => _composeText(context, model, current),
-            ),
+            ..._sendOptions(context, model, [current]),
             const Divider(),
             if (!current.isSession)
               _Option(
                 icon: Icons.edit_outlined,
                 label: tr.rename,
                 onTap: () => _rename(context, model, current),
+              ),
+            if (!current.isSession)
+              _Option(
+                icon: current.isMine ? Icons.people_outline_rounded : Icons.devices_rounded,
+                label: current.isMine ? tr.moveToOther : tr.moveToMine,
+                onTap: () => _move(context, model, current),
               ),
             _Option(
               icon: current.isSession ? Icons.link_off_rounded : Icons.delete_outline_rounded,
@@ -108,6 +103,78 @@ class _SendSheet extends StatelessWidget {
     );
   }
 }
+
+class _GroupSheet extends StatelessWidget {
+  const _GroupSheet({required this.group, required this.peers});
+
+  final String group;
+  final List<Peer> peers;
+
+  @override
+  Widget build(BuildContext context) {
+    final model = AppScope.of(context);
+    final theme = Theme.of(context);
+    final online = peers.where((p) => model.snapshot.peer(p.id)?.online ?? false).length;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.groups_outlined)),
+              title: Text(tr.sendToGroup(group), style: theme.textTheme.titleMedium),
+              subtitle: Text(
+                '${tr.groupDevices(peers.length)} · ${tr.online} $online',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (online < peers.length)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(tr.offlineNote, style: theme.textTheme.bodySmall),
+              ),
+            const Divider(),
+            ..._sendOptions(context, model, peers),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Что отправить: файлы, фото и видео, папку, текст, буфер обмена — одному
+/// устройству или всей группе.
+List<Widget> _sendOptions(BuildContext context, AppModel model, List<Peer> peers) => [
+      _Option(
+        icon: Icons.insert_drive_file_outlined,
+        label: tr.sendFiles,
+        onTap: () => _pickAndSend(context, model, peers, media: false),
+      ),
+      if (isMobile)
+        _Option(
+          icon: Icons.photo_library_outlined,
+          label: tr.sendMedia,
+          onTap: () => _pickAndSend(context, model, peers, media: true),
+        ),
+      if (isDesktop)
+        _Option(
+          icon: Icons.folder_outlined,
+          label: tr.sendFolder,
+          onTap: () => _pickFolderAndSend(context, model, peers),
+        ),
+      _Option(
+        icon: Icons.notes_rounded,
+        label: tr.sendText,
+        onTap: () => _composeText(context, model, peers),
+      ),
+      _Option(
+        icon: Icons.content_paste_rounded,
+        label: tr.sendClipboard,
+        onTap: () => _sendClipboard(context, model, peers),
+      ),
+    ];
 
 class _Option extends StatelessWidget {
   const _Option({required this.icon, required this.label, required this.onTap, this.danger = false});
@@ -128,16 +195,35 @@ class _Option extends StatelessWidget {
   }
 }
 
-Future<void> _sendPaths(AppModel model, Peer peer, List<String> paths) async {
-  if (paths.isEmpty) return;
-  try {
-    await model.sendFiles(peer.id, paths);
-  } on CoreError catch (e) {
-    showSnack(tr.error(e.code));
+Future<void> _sendPaths(AppModel model, List<Peer> peers, List<String> paths) async {
+  if (paths.isEmpty || peers.isEmpty) return;
+  if (peers.length == 1) {
+    try {
+      await model.sendFiles(peers.first.id, paths);
+    } on CoreError catch (e) {
+      showSnack(tr.error(e.code));
+    }
+    return;
   }
+  final n = await model.sendFilesToMany([for (final p in peers) p.id], paths);
+  showSnack(tr.sendingToMany(n), duration: const Duration(seconds: 2));
 }
 
-Future<void> _pickAndSend(BuildContext context, AppModel model, Peer peer, {required bool media}) async {
+Future<void> _sendTextTo(AppModel model, List<Peer> peers, String text) async {
+  if (text.trim().isEmpty || peers.isEmpty) return;
+  if (peers.length == 1) {
+    try {
+      await model.sendText(peers.first.id, text);
+    } on CoreError catch (e) {
+      showSnack(tr.error(e.code));
+    }
+    return;
+  }
+  final n = await model.sendTextToMany([for (final p in peers) p.id], text);
+  showSnack(tr.sendingToMany(n), duration: const Duration(seconds: 2));
+}
+
+Future<void> _pickAndSend(BuildContext context, AppModel model, List<Peer> peers, {required bool media}) async {
   Navigator.of(context).pop();
   final List<String> paths;
   try {
@@ -146,10 +232,10 @@ Future<void> _pickAndSend(BuildContext context, AppModel model, Peer peer, {requ
     showSnack(tr.error('read'));
     return;
   }
-  await _sendPaths(model, peer, paths);
+  await _sendPaths(model, peers, paths);
 }
 
-Future<void> _pickFolderAndSend(BuildContext context, AppModel model, Peer peer) async {
+Future<void> _pickFolderAndSend(BuildContext context, AppModel model, List<Peer> peers) async {
   Navigator.of(context).pop();
   final String? folder;
   try {
@@ -158,17 +244,39 @@ Future<void> _pickFolderAndSend(BuildContext context, AppModel model, Peer peer)
     showSnack(tr.error('read'));
     return;
   }
-  if (folder != null) await _sendPaths(model, peer, [folder]);
+  if (folder != null) await _sendPaths(model, peers, [folder]);
 }
 
-Future<void> _composeText(BuildContext context, AppModel model, Peer peer) async {
+Future<void> _composeText(BuildContext context, AppModel model, List<Peer> peers) async {
   Navigator.of(context).pop();
   final ctx = navigatorKey.currentContext;
   if (ctx == null) return;
-  final text = await showDialog<String>(context: ctx, builder: (_) => _TextComposer(peer: peer));
-  if (text == null || text.trim().isEmpty) return;
+  final title = peers.length == 1 ? tr.sendTo(tr.deviceName(peers.first.name)) : tr.sendAll;
+  final text = await showDialog<String>(context: ctx, builder: (_) => _TextComposer(title: title));
+  if (text == null) return;
+  await _sendTextTo(model, peers, text);
+}
+
+/// Текст из буфера обмена — сразу, без окна.
+Future<void> _sendClipboard(BuildContext context, AppModel model, List<Peer> peers) async {
+  Navigator.of(context).pop();
+  final data = await Clipboard.getData(Clipboard.kTextPlain);
+  final text = data?.text ?? '';
+  if (text.trim().isEmpty) {
+    showSnack(tr.clipboardEmpty, duration: const Duration(seconds: 2));
+    return;
+  }
+  await _sendTextTo(model, peers, text);
+}
+
+/// Перенести между «Моими» и «Чужими» устройствами.
+Future<void> _move(BuildContext context, AppModel model, Peer peer) async {
+  Navigator.of(context).pop();
+  final toOther = peer.isMine;
   try {
-    await model.sendText(peer.id, text);
+    await model.setTrust(peer.id, toOther ? 'other' : 'mine');
+    final name = tr.deviceName(peer.name);
+    showSnack(toOther ? tr.movedToOther(name) : tr.movedToMine(name));
   } on CoreError catch (e) {
     showSnack(tr.error(e.code));
   }
@@ -243,9 +351,9 @@ Future<void> _forget(BuildContext context, AppModel model, Peer peer) async {
 }
 
 class _TextComposer extends StatefulWidget {
-  const _TextComposer({required this.peer});
+  const _TextComposer({required this.title});
 
-  final Peer peer;
+  final String title;
 
   @override
   State<_TextComposer> createState() => _TextComposerState();
@@ -271,7 +379,7 @@ class _TextComposerState extends State<_TextComposer> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(tr.sendTo(tr.deviceName(widget.peer.name))),
+      title: Text(widget.title),
       content: SizedBox(
         width: 420,
         child: TextField(
@@ -366,13 +474,9 @@ class _ShareTargets extends StatelessWidget {
                           Navigator.of(context).pop();
                           final text = payload.text;
                           if (payload.files.isNotEmpty) {
-                            await _sendPaths(model, p, payload.files);
+                            await _sendPaths(model, [p], payload.files);
                           } else if (text != null) {
-                            try {
-                              await model.sendText(p.id, text);
-                            } on CoreError catch (e) {
-                              showSnack(tr.error(e.code));
-                            }
+                            await _sendTextTo(model, [p], text);
                           }
                         },
                       ),

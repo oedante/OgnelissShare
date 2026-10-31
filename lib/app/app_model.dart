@@ -120,6 +120,33 @@ class AppModel extends ChangeNotifier {
   /// Своё имя для связанного устройства; пустое — имя, которое оно сообщает.
   Future<void> renamePeer(String peer, String name) => core.call('rename_peer', {'peer': peer, 'name': name});
 
+  /// Перенести устройство в «Мои» (mine) или «Чужие» (other).
+  Future<void> setTrust(String peer, String trust) => core.call('set_trust', {'peer': peer, 'trust': trust});
+
+  /// Отправить одно и то же на несколько устройств. Возвращает, сколько
+  /// передач начато; ошибки по отдельным устройствам пропускаются.
+  Future<int> sendFilesToMany(List<String> peers, List<String> paths) async {
+    var started = 0;
+    for (final p in peers) {
+      try {
+        await sendFiles(p, paths);
+        started++;
+      } catch (_) {}
+    }
+    return started;
+  }
+
+  Future<int> sendTextToMany(List<String> peers, String text) async {
+    var started = 0;
+    for (final p in peers) {
+      try {
+        await sendText(p, text);
+        started++;
+      } catch (_) {}
+    }
+    return started;
+  }
+
   Future<void> respondPair(String id, bool accept) =>
       _quiet(core.call('respond_pair', {'id': id, 'accept': accept}));
 
@@ -180,7 +207,7 @@ class JoinInfo {
   final String name;
   final String platform;
 
-  /// pair, once или files.
+  /// pair, other, once или files.
   final String mode;
 
   /// Четыре цифры, которые должны совпасть на обоих экранах.
@@ -191,6 +218,7 @@ class JoinInfo {
 
   bool get once => mode == 'once' || mode == 'files';
   bool get files => mode == 'files';
+  bool get other => mode == 'other';
 }
 
 /// Доступ к [AppModel] из любого виджета: `AppScope.of(context)`.

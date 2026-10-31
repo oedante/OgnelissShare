@@ -238,6 +238,14 @@ class _RequestDialogState extends State<RequestDialog> {
             ),
             const SizedBox(height: 12),
             Text(r.viaLink ? tr.pairRequestLinkBody : tr.pairRequestBody, textAlign: TextAlign.center),
+            if (r.mode == 'other') ...[
+              const SizedBox(height: 8),
+              Text(
+                tr.pairAsOther,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
           ],
         ),
         actions: [

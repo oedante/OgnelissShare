@@ -18,7 +18,7 @@ import 'shell.dart';
 String linkMessage(LinkItem link, String deviceName) {
   final until = formatUntil(link.expires);
   final body = switch (link.mode) {
-    'pair' => tr.msgPair(tr.deviceName(deviceName), until, link.url),
+    'pair' || 'other' => tr.msgPair(tr.deviceName(deviceName), until, link.url),
     'files' => tr.msgFiles(formatNames(link.names, link.count), until, link.url),
     _ => tr.msgOnce(until, link.url),
   };

@@ -123,7 +123,7 @@ class _JoinScreenState extends State<JoinScreen> {
           Text(
             info.files
                 ? tr.joinDoneFiles(name)
-                : (info.once ? tr.joinDoneOnce(name) : tr.joinDone(name)),
+                : (info.once ? tr.joinDoneOnce(name) : (info.other ? tr.joinDoneOther(name) : tr.joinDone(name))),
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium,
           ),

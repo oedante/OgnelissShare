@@ -45,7 +45,8 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final model = AppScope.of(context);
     final snap = model.snapshot;
-    final paired = [for (final p in snap.peers) if (!p.isSession) p];
+    final mine = [for (final p in snap.peers) if (p.isMine) p];
+    final others = [for (final p in snap.peers) if (p.isOther) p];
     final sessions = [for (final p in snap.peers) if (p.isSession) p];
     final anyFinished = snap.transfers.any((t) => t.isFinished);
 
@@ -96,9 +97,13 @@ class HomeScreen extends StatelessWidget {
               children: [
                 _MeCard(me: snap.me),
                 if (snap.peers.isEmpty) const _EmptyDevices(),
-                if (paired.isNotEmpty) ...[
-                  SectionHeader(tr.myDevices),
-                  _DeviceGroup(peers: paired),
+                if (mine.isNotEmpty) ...[
+                  SectionHeader(tr.myDevices, trailing: _sendAll(context, tr.myDevices, mine)),
+                  _DeviceGroup(peers: mine),
+                ],
+                if (others.isNotEmpty) ...[
+                  SectionHeader(tr.otherDevices, trailing: _sendAll(context, tr.otherDevices, others)),
+                  _DeviceGroup(peers: others),
                 ],
                 if (sessions.isNotEmpty) ...[
                   SectionHeader(tr.oneTimePeers),
@@ -138,6 +143,16 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// «Отправить всем» — когда в группе больше одного устройства.
+Widget? _sendAll(BuildContext context, String group, List<Peer> peers) {
+  if (peers.length < 2) return null;
+  return TextButton.icon(
+    onPressed: () => showGroupSendSheet(context, group, peers),
+    icon: const Icon(Icons.send_rounded, size: 18),
+    label: Text(tr.sendAll),
+  );
 }
 
 class _MeCard extends StatelessWidget {
@@ -345,11 +360,13 @@ class _LinkTile extends StatelessWidget {
     final theme = Theme.of(context);
     final IconData icon = switch (link.mode) {
       'pair' => Icons.devices_rounded,
+      'other' => Icons.people_outline_rounded,
       'files' => Icons.insert_drive_file_outlined,
       _ => Icons.swap_horiz_rounded,
     };
     final String title = switch (link.mode) {
       'pair' => tr.linkPair,
+      'other' => tr.linkOther,
       'files' => tr.linkFiles(formatNames(link.names, link.count)),
       _ => tr.linkOnce,
     };

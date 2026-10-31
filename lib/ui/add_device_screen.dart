@@ -21,7 +21,7 @@ import 'widgets.dart';
 class AddDeviceScreen extends StatefulWidget {
   const AddDeviceScreen({super.key, this.mode = 'pair'});
 
-  /// pair — моё устройство; once — разовый обмен.
+  /// pair — моё устройство; other — чужое; once — разовый обмен.
   final String mode;
 
   @override
@@ -116,15 +116,20 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
               children: [
                 SegmentedButton<String>(
                   segments: [
-                    ButtonSegment(value: 'pair', icon: const Icon(Icons.devices_rounded), label: Text(tr.modeMine)),
-                    ButtonSegment(value: 'once', icon: const Icon(Icons.swap_horiz_rounded), label: Text(tr.modeOnce)),
+                    ButtonSegment(value: 'pair', icon: const Icon(Icons.devices_rounded), label: Text(tr.segMine)),
+                    ButtonSegment(value: 'other', icon: const Icon(Icons.people_outline_rounded), label: Text(tr.segOther)),
+                    ButtonSegment(value: 'once', icon: const Icon(Icons.swap_horiz_rounded), label: Text(tr.segOnce)),
                   ],
                   selected: {_mode},
                   onSelectionChanged: (s) => _setMode(s.first),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _mode == 'pair' ? tr.modeMineBody : tr.modeOnceBody,
+                  switch (_mode) {
+                    'pair' => tr.modeMineBody,
+                    'other' => tr.modeOtherBody,
+                    _ => tr.modeOnceBody,
+                  },
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
@@ -245,7 +250,11 @@ class _JoinedCard extends StatelessWidget {
         text = tr.joinedDeclined(tr.deviceName(joined.name));
         badge = Icon(Icons.block_rounded, size: 48, color: theme.colorScheme.error);
       default:
-        text = mode == 'once' ? tr.joinedOnce(tr.deviceName(joined.name)) : tr.joinedDone(tr.deviceName(joined.name));
+        text = switch (mode) {
+          'once' => tr.joinedOnce(tr.deviceName(joined.name)),
+          'other' => tr.joinedDoneOther(tr.deviceName(joined.name)),
+          _ => tr.joinedDone(tr.deviceName(joined.name)),
+        };
         badge = const Icon(Icons.check_circle_rounded, size: 56, color: Brand.ok);
     }
     final finished = joined.state != 'pending';

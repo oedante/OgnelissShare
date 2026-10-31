@@ -108,6 +108,79 @@
   "@oneTimePeers": {
     "description": "Раздел"
   },
+  "otherDevices": "Other people’s devices",
+  "@otherDevices": {
+    "description": "Раздел: постоянная связь, передачи подтверждаются"
+  },
+  "otherDevicesNote": "You confirm every transfer of files from these devices",
+  "@otherDevicesNote": {
+    "description": "Подсказка под разделом"
+  },
+  "sendAll": "Send to all",
+  "@sendAll": {
+    "description": "Кнопка у раздела"
+  },
+  "sendToGroup": "Send to all: {group}",
+  "@sendToGroup": {
+    "description": "Заголовок меню",
+    "placeholders": {
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "groupDevices": "{count, plural, =1{1 device} other{{count} devices}}",
+  "@groupDevices": {
+    "description": "Сколько устройств в группе",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sendingToMany": "{count, plural, =1{Sending to 1 device} other{Sending to {count} devices}}",
+  "@sendingToMany": {
+    "description": "Уведомление",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sendClipboard": "Clipboard",
+  "@sendClipboard": {
+    "description": "Пункт меню: отправить текст из буфера обмена"
+  },
+  "clipboardEmpty": "The clipboard has no text",
+  "@clipboardEmpty": {
+    "description": "Уведомление"
+  },
+  "moveToOther": "Move to other people’s devices",
+  "@moveToOther": {
+    "description": "Пункт меню"
+  },
+  "moveToMine": "Move to my devices",
+  "@moveToMine": {
+    "description": "Пункт меню"
+  },
+  "movedToOther": "“{name}” is now among other people’s devices: you confirm transfers from it",
+  "@movedToOther": {
+    "description": "Уведомление",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "movedToMine": "“{name}” is now among your devices: its files are accepted on their own",
+  "@movedToMine": {
+    "description": "Уведомление",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "online": "online",
   "@online": {
     "description": "Состояние устройства"
@@ -346,6 +419,52 @@
   "modeOnce": "One-time",
   "@modeOnce": {
     "description": "Режим"
+  },
+  "modeOther": "Someone else’s device",
+  "@modeOther": {
+    "description": "Режим"
+  },
+  "segMine": "Mine",
+  "@segMine": {
+    "description": "Короткая подпись режима: моё устройство"
+  },
+  "segOther": "Other",
+  "@segOther": {
+    "description": "Короткая подпись режима: чужое устройство"
+  },
+  "segOnce": "One-time",
+  "@segOnce": {
+    "description": "Короткая подпись режима: разовый обмен"
+  },
+  "modeOtherBody": "For the device of someone you often exchange files with. The link is kept, and you confirm every transfer of files. On their device: open Ogneliss Share and tap “Scan code”.",
+  "@modeOtherBody": {
+    "description": "Пояснение режима"
+  },
+  "joinedDoneOther": "“{name}” added to other people’s devices. You confirm every transfer from it.",
+  "@joinedDoneOther": {
+    "description": "Состояние кода",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinDoneOther": "Done! “{name}” is now among other people’s devices: transfers are confirmed every time.",
+  "@joinDoneOther": {
+    "description": "Итог",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pairAsOther": "It will be added to other people’s devices: you confirm every transfer.",
+  "@pairAsOther": {
+    "description": "Вопрос о подключении"
+  },
+  "linkOther": "Invitation · someone else’s device",
+  "@linkOther": {
+    "description": "Ссылка в списке"
   },
   "modeMineBody": "For your own devices. The link is kept and files are accepted without asking. On the other device open Ogneliss Share and tap “Scan code”.",
   "@modeMineBody": {
