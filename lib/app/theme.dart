@@ -236,3 +236,19 @@ IconData platformIcon(String platform) => switch (platform) {
       'linux' => AppIcons.computer,
       _ => AppIcons.devices_other,
     };
+
+/// Переход без анимации (как в Ogneliss Mail): экран сменяется сразу.
+class NoPageTransitionsBuilder extends PageTransitionsBuilder {
+  const NoPageTransitionsBuilder();
+
+  // Длительность — ноль, иначе Hero и затемнение шли бы 300 мс.
+  // ignore: annotate_overrides
+  Duration get transitionDuration => Duration.zero;
+  // ignore: annotate_overrides
+  Duration get reverseTransitionDuration => Duration.zero;
+
+  @override
+  Widget buildTransitions<T>(PageRoute<T> route, BuildContext context, Animation<double> animation,
+          Animation<double> secondaryAnimation, Widget child) =>
+      child;
+}
