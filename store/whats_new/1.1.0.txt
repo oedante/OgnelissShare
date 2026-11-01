@@ -1,0 +1,10 @@
+<ru-RU>
+• Новое оформление — как у Ogneliss Mail: спокойные цвета, белые карточки, тонкие значки и один шрифт на всех устройствах
+• Тёмная тема в тех же оттенках
+• Названия разделов выделены цветом, списки без лишних линий
+</ru-RU>
+<en-US>
+• New look, matching Ogneliss Mail: calm colors, white cards, thin icons and the same font on every device
+• Dark theme in the same shades
+• Section titles in color, lists without extra lines
+</en-US>

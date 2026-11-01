@@ -30,7 +30,7 @@ python3 tool/bootstrap.py        # каталоги платформ, пакет
 | macOS | Mac | `python3 tool/release/build.py macos` | zip с .app без подписи — для проверки |
 | iOS | Mac | `python3 tool/release/build.py ios` | .ipa без подписи — для проверки |
 
-Версия берётся из `pubspec.yaml` (`version: 1.0.0+4`). Номер сборки для
+Версия берётся из `pubspec.yaml` (`version: 1.1.0+5`). Номер сборки для
 Android, iOS и macOS считается сам: это минуты с 01.01.2026, поэтому каждая
 следующая сборка больше предыдущей. Перед выпуском поднимите `version` и
 допишите заметки `store/whats_new/<версия>.txt`.
