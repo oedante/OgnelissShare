@@ -6,7 +6,7 @@
 [BUILD_IDE.md](BUILD_IDE.md).
 
 Перед каждым выпуском:
-1. Поднять `version` в `pubspec.yaml` (например, `1.2.0+6` → `1.3.0+7`).
+1. Поднять `version` в `pubspec.yaml` (например, `1.3.0+7` → `1.4.0+8`).
 2. Написать заметки `store/whats_new/<версия>.txt` (по-русски и
    по-английски, не длиннее 500 знаков каждая) и проверить:
    `python tool/release/check_store.py`.

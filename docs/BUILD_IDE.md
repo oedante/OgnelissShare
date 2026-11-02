@@ -172,7 +172,7 @@ Team (или *Sign to Run Locally*) → ▶. Приложение без под�
 следующая сборка скриптом окажется «меньше» и App Store Connect её отклонит:
 ```bash
 BUILD=$(python3 -c 'import datetime as d; print(int((d.datetime.now(d.timezone.utc) - d.datetime(2026, 1, 1, tzinfo=d.timezone.utc)).total_seconds() // 60))')
-flutter build ios --config-only --release --build-name=1.2.0 --build-number=$BUILD
+flutter build ios --config-only --release --build-name=1.3.0 --build-number=$BUILD
 ```
 1. Вверху устройство **Any iOS Device (arm64)** → **Product → Archive**.
 2. Откроется **Organizer** → архив → **Distribute App** → **App Store
@@ -180,7 +180,7 @@ flutter build ios --config-only --release --build-name=1.2.0 --build-number=$BUI
 3. Через 5–30 минут сборка появится в App Store Connect → TestFlight.
 
 Для Mac — то же в `macos/Runner.xcworkspace`, сначала
-`flutter build macos --config-only --release --build-name=1.2.0 --build-number=$BUILD`,
+`flutter build macos --config-only --release --build-name=1.3.0 --build-number=$BUILD`,
 устройство **Any Mac**.
 
 Без окон Xcode, одной командой, с проверкой версии Xcode и номером сборки:
