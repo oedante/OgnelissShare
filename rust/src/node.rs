@@ -288,6 +288,8 @@ pub(crate) struct State {
     pub busy_conns: HashMap<usize, u32>,
     /// Одноразовые ссылки, по которым сейчас ждут решения «Подключить?».
     pub link_busy: HashSet<String>,
+    /// Раздача в браузер по локальной сети (нет раздач — None, порт закрыт).
+    pub web: Option<crate::webshare::WebSlot>,
 }
 
 impl State {
@@ -408,6 +410,7 @@ impl Node {
                 active: true,
                 busy_conns: HashMap::new(),
                 link_busy: HashSet::new(),
+                web: None,
             }),
             cancel: CancellationToken::new(),
             kick: Notify::new(),
@@ -428,7 +431,18 @@ impl Node {
         tokio::spawn(node.clone().watch_network());
         tokio::spawn(node.clone().save_loop());
         let roots = [download_dir.join(crate::transfer::STAGE_DIR), node.cfg.data_dir.join("stage")];
-        tokio::task::spawn_blocking(move || roots.iter().for_each(|r| crate::transfer::cleanup_stale(r)));
+        // Раздачи в браузер не переживают перезапуск — их копии больше не нужны.
+        // Папку сразу переименовываем: новая раздача не попадёт под удаление.
+        let data_dir = node.cfg.data_dir.clone();
+        let _ = std::fs::rename(data_dir.join("web"), data_dir.join(format!("web-old-{}", random_id())));
+        tokio::task::spawn_blocking(move || {
+            roots.iter().for_each(|r| crate::transfer::cleanup_stale(r));
+            for e in std::fs::read_dir(&data_dir).into_iter().flatten().flatten() {
+                if e.file_name().to_string_lossy().starts_with("web-old-") {
+                    let _ = std::fs::remove_dir_all(e.path());
+                }
+            }
+        });
         Ok(node)
     }
 
@@ -568,6 +582,7 @@ impl Node {
     pub fn set_name(self: &Arc<Self>, name: &str) {
         let name = name.trim();
         self.with(|s| s.saved.name = if name.is_empty() { String::new() } else { clean_name(name) });
+        self.web_set_name(&self.name());
         self.save();
         self.events.changed();
         let conns = self.live_connections();
@@ -828,6 +843,7 @@ impl Node {
                 _ = self.kick.notified() => {}
             }
             self.housekeeping();
+            self.web_tick();
             if !self.with(|s| s.active) {
                 continue;
             }
@@ -1713,13 +1729,14 @@ impl Node {
             "requests": requests,
             "transfers": transfers,
             "links": links,
+            "web_shares": self.web_snapshot(),
         })
     }
 }
 
 /// Перенести файлы в папку ссылки (переименованием, а если нельзя —
 /// копией). Папки и файлы, которых нет на месте, не трогаем.
-fn take_into(dir: &Path, paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
+pub(crate) fn take_into(dir: &Path, paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
     std::fs::create_dir_all(dir)?;
     let mut out = Vec::with_capacity(paths.len());
     for (i, src) in paths.iter().enumerate() {

@@ -117,6 +117,14 @@ class AppModel extends ChangeNotifier {
 
   Future<void> revokeLink(String id) => core.call('revoke_link', {'id': id});
 
+  /// Раздать файлы в браузер по локальной сети на [minutes] минут.
+  Future<WebShare> startWebShare(List<String> paths, {int minutes = 30, bool takeFiles = false}) async {
+    final r = await core.call('web_share_start', {'paths': paths, 'minutes': minutes, 'take_files': takeFiles});
+    return WebShare.fromJson(r is Map ? Map<String, dynamic>.from(r) : <String, dynamic>{});
+  }
+
+  Future<void> stopWebShare(String id) => core.call('web_share_stop', {'id': id});
+
   /// Своё имя для связанного устройства; пустое — имя, которое оно сообщает.
   Future<void> renamePeer(String peer, String name) => core.call('rename_peer', {'peer': peer, 'name': name});
 

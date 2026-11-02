@@ -82,6 +82,13 @@ fn dispatch(v: &Value) -> Result<Value> {
         _ => {}
     }
     let node = node()?;
+    if cmd == "web_share_start" {
+        // Поднять сервер — дело асинхронное: ждём его здесь, вне контекста среды.
+        let minutes = v.get("minutes").and_then(Value::as_u64).unwrap_or(30);
+        let take = v.get("take_files").and_then(Value::as_bool).unwrap_or(false);
+        let paths = paths_arg(v);
+        return runtime().block_on(async move { node.web_share(paths, minutes, take).await });
+    }
     // Команды запускают фоновые задачи — им нужен контекст среды выполнения.
     let _rt = runtime().enter();
     match cmd {
@@ -163,6 +170,10 @@ fn dispatch(v: &Value) -> Result<Value> {
         }
         "clear_transfers" => {
             node.clear_transfers();
+            ok()
+        }
+        "web_share_stop" => {
+            node.web_unshare(str_arg(v, "id")?)?;
             ok()
         }
         "get_text" => Ok(json!(node.get_text(str_arg(v, "id")?))),

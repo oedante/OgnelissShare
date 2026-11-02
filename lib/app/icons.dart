@@ -51,4 +51,5 @@ abstract final class AppIcons {
   static const IconData south_west = Symbols.south_west_rounded;
   static const IconData swap_horiz = Symbols.swap_horiz_rounded;
   static const IconData timer_off = Symbols.timer_off_rounded;
+  static const IconData wifi_off = Symbols.wifi_off_rounded;
 }

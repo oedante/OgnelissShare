@@ -714,6 +714,80 @@
   "@filesByLinkHint": {
     "description": "Подсказка"
   },
+  "filesByLinkApp": "The recipient is far away: a link by e-mail or in a messenger. They download the files in the Ogneliss Share app while this device is online, within 24 hours.",
+  "@filesByLinkApp": {
+    "description": "Подсказка к способу «по ссылке»"
+  },
+  "giveFiles": "Share files",
+  "@giveFiles": {
+    "description": "Кнопка: файлы тому, чьего устройства нет в списке"
+  },
+  "giveFilesHow": "How to share the files?",
+  "@giveFilesHow": {
+    "description": "Заголовок выбора способа"
+  },
+  "webQr": "QR code for a browser",
+  "@webQr": {
+    "description": "Способ: скачать в браузере без приложения"
+  },
+  "webQrHint": "The recipient is nearby on the same Wi-Fi: points the camera at the code and downloads in the browser. Nothing to install.",
+  "@webQrHint": {
+    "description": "Подсказка"
+  },
+  "webTitle": "No app needed",
+  "@webTitle": {
+    "description": "Заголовок экрана раздачи в браузер"
+  },
+  "webScan": "Point the phone camera at the code",
+  "@webScan": {
+    "description": "Подпись над QR-кодом"
+  },
+  "webValid": "Valid for {time}",
+  "@webValid": {
+    "description": "Обратный отсчёт",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "webDownloads": "{count, plural, =0{not downloaded yet} =1{downloaded once} other{downloaded {count} times}}",
+  "@webDownloads": {
+    "description": "Сколько раз файлы скачали целиком",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "webSameNetwork": "The recipient must be on the same Wi-Fi as this device or connect to its hotspot. Keep the app open until the download finishes.",
+  "@webSameNetwork": {
+    "description": "Подсказка"
+  },
+  "webNoNetwork": "This device is not on Wi-Fi. Connect to a network or turn on the hotspot, and let the recipient join it.",
+  "@webNoNetwork": {
+    "description": "Нет локальной сети"
+  },
+  "webOtherAddress": "Another address",
+  "@webOtherAddress": {
+    "description": "Кнопка: устройство в нескольких сетях"
+  },
+  "webStop": "Stop",
+  "@webStop": {
+    "description": "Кнопка"
+  },
+  "webEnded": "Sharing has ended",
+  "@webEnded": {
+    "description": "Время вышло или остановлено"
+  },
+  "webSection": "In a browser",
+  "@webSection": {
+    "description": "Раздел главного экрана"
+  },
+  "webShow": "Show the code",
+  "@webShow": {
+    "description": "Кнопка"
+  },
   "links": "Links",
   "@links": {
     "description": "Раздел главного экрана"

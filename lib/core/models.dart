@@ -341,6 +341,49 @@ class TransferItem {
   }
 }
 
+/// Раздача «без приложения»: получатель открывает адрес (QR-код) в браузере
+/// и скачивает файлы прямо с этого устройства по локальной сети.
+class WebShare {
+  const WebShare({
+    required this.id,
+    required this.url,
+    required this.urls,
+    required this.expires,
+    required this.count,
+    required this.total,
+    required this.names,
+    required this.downloads,
+  });
+
+  factory WebShare.fromJson(Map<String, dynamic> j) => WebShare(
+        id: _str(j['id']),
+        url: _str(j['url']),
+        urls: _strings(j['urls']),
+        expires: _int(j['expires']),
+        count: _int(j['count']),
+        total: _int(j['total']),
+        names: _strings(j['names']),
+        downloads: _int(j['downloads']),
+      );
+
+  final String id;
+
+  /// Лучший адрес в локальной сети; пусто — устройство не в Wi-Fi.
+  final String url;
+
+  /// Все подходящие адреса (несколько сетей), лучший первым.
+  final List<String> urls;
+
+  /// До какого момента действует (секунды Unix).
+  final int expires;
+  final int count;
+  final int total;
+  final List<String> names;
+
+  /// Сколько раз файлы скачали целиком.
+  final int downloads;
+}
+
 class Snapshot {
   const Snapshot({
     required this.me,
@@ -349,6 +392,7 @@ class Snapshot {
     required this.requests,
     required this.transfers,
     this.links = const [],
+    this.webShares = const [],
   });
 
   factory Snapshot.fromJson(Map<String, dynamic> j) => Snapshot(
@@ -358,6 +402,7 @@ class Snapshot {
         requests: [for (final r in _maps(j['requests'])) Request.fromJson(r)],
         transfers: [for (final t in _maps(j['transfers'])) TransferItem.fromJson(t)],
         links: [for (final l in _maps(j['links'])) LinkItem.fromJson(l)],
+        webShares: [for (final w in _maps(j['web_shares'])) WebShare.fromJson(w)],
       );
 
   static const empty = Snapshot(me: Me.empty, peers: [], invite: null, requests: [], transfers: []);
@@ -372,6 +417,16 @@ class Snapshot {
 
   /// Действующие ссылки, сначала новые.
   final List<LinkItem> links;
+
+  /// Раздачи в браузер по локальной сети, сначала новые.
+  final List<WebShare> webShares;
+
+  WebShare? webShare(String id) {
+    for (final w in webShares) {
+      if (w.id == id) return w;
+    }
+    return null;
+  }
 
   Peer? peer(String id) {
     for (final p in peers) {

@@ -15,6 +15,8 @@ pub mod proto;
 pub mod store;
 pub mod transfer;
 pub mod util;
+pub mod web;
+mod webshare;
 
 #[cfg(test)]
 mod tests;

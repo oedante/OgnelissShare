@@ -1,0 +1,12 @@
+<ru-RU>
+Новое в Ogneliss Share 1.3:
+• QR-код для браузера: отдайте файлы человеку рядом — он наводит камеру и скачивает их в браузере, без приложения и без серверов (та же Wi-Fi или точка доступа телефона)
+• «Отдать файлы»: выбор между QR-кодом и ссылкой для приложения
+• передача продолжается после обрыва связи и не зависает при VPN на одном из устройств
+</ru-RU>
+<en-US>
+New in Ogneliss Share 1.3:
+• QR code for a browser: give files to someone nearby — they point the camera and download in the browser, no app and no servers (same Wi-Fi or your phone’s hotspot)
+• Share files: choose between a QR code and a link for the app
+• transfers resume after a dropped connection and no longer stall with a VPN on one device
+</en-US>

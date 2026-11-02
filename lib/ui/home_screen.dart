@@ -17,6 +17,7 @@ import 'settings_screen.dart';
 import 'share_link.dart';
 import 'shell.dart';
 import 'transfer_tile.dart';
+import 'web_share_screen.dart';
 import 'widgets.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -28,8 +29,9 @@ class HomeScreen extends StatelessWidget {
   static void openScan(BuildContext context) =>
       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ScanScreen()));
 
-  /// Файлы по ссылке: выбрать файлы и отправить ссылку на них.
-  static Future<void> filesByLink(BuildContext context) async {
+  /// Отдать файлы тому, чьего устройства нет в списке: выбрать файлы, затем
+  /// способ — QR-код для браузера (рядом) или ссылка для приложения (далеко).
+  static Future<void> giveFiles(BuildContext context) async {
     final List<String> paths;
     try {
       paths = await Files.pickFiles();
@@ -38,8 +40,8 @@ class HomeScreen extends StatelessWidget {
       return;
     }
     if (paths.isEmpty || !context.mounted) return;
-    // На телефонах выбранное — временные копии: ядро заберёт их к ссылке.
-    await createAndShareLink(context, 'files', paths: paths, takeFiles: isMobile);
+    // На телефонах выбранное — временные копии: ядро заберёт их себе.
+    await showGiveFilesSheet(context, paths, takeFiles: isMobile);
   }
 
   @override
@@ -68,9 +70,9 @@ class HomeScreen extends StatelessWidget {
             onPressed: () => openScan(context),
           ),
           IconButton(
-            tooltip: tr.filesByLink,
+            tooltip: tr.giveFiles,
             icon: const Icon(AppIcons.add_link),
-            onPressed: () => filesByLink(context),
+            onPressed: () => giveFiles(context),
           ),
           IconButton(
             tooltip: tr.settings,
@@ -109,6 +111,15 @@ class HomeScreen extends StatelessWidget {
                 if (sessions.isNotEmpty) ...[
                   SectionHeader(tr.oneTimePeers),
                   _DeviceGroup(peers: sessions),
+                ],
+                if (snap.webShares.isNotEmpty) ...[
+                  SectionHeader(tr.webSection),
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [for (final w in snap.webShares) WebShareTile(key: ValueKey(w.id), share: w)],
+                    ),
+                  ),
                 ],
                 if (snap.links.isNotEmpty) ...[
                   SectionHeader(tr.links),
@@ -263,9 +274,9 @@ class _EmptyDevices extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: () => HomeScreen.filesByLink(context),
+                onPressed: () => HomeScreen.giveFiles(context),
                 icon: const Icon(AppIcons.add_link),
-                label: Text(tr.filesByLink),
+                label: Text(tr.giveFiles),
               ),
             ],
           ),

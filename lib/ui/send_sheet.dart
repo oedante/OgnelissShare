@@ -15,6 +15,7 @@ import '../platform/startup.dart';
 import '../l10n/l10n.dart';
 import 'share_link.dart';
 import 'shell.dart';
+import 'web_share_screen.dart';
 import 'widgets.dart';
 
 /// Меню «Отправить на …» для устройства.
@@ -453,9 +454,21 @@ class _ShareTargets extends StatelessWidget {
             ),
             if (payload.files.isNotEmpty)
               ListTile(
+                leading: const Icon(AppIcons.qr_code_2),
+                title: Text(tr.webQr),
+                subtitle: Text(tr.webQrHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  final ctx = navigatorKey.currentContext;
+                  if (ctx == null) return;
+                  startWebShare(ctx, payload.files, takeFiles: true);
+                },
+              ),
+            if (payload.files.isNotEmpty)
+              ListTile(
                 leading: const Icon(AppIcons.add_link),
                 title: Text(tr.filesByLink),
-                subtitle: Text(tr.filesByLinkHint),
+                subtitle: Text(tr.filesByLinkApp),
                 onTap: () {
                   Navigator.of(context).pop();
                   final ctx = navigatorKey.currentContext;

@@ -543,3 +543,32 @@ async fn throughput() {
     let _ = std::fs::remove_dir_all(&base_a);
     let _ = std::fs::remove_dir_all(&base_b);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn web_share_takes_copies_and_cleans_up() {
+    let (a, base) = make_node("web").await;
+    let src = base.join("pick");
+    std::fs::create_dir_all(&src).unwrap();
+    let file = src.join("фото.jpg");
+    std::fs::write(&file, b"0123456789").unwrap();
+
+    // Копия с телефона: узел забирает файл себе, исходного места он больше не занимает.
+    let share = a.web_share(vec![file.clone()], 30, true).await.expect("share");
+    let id = share["id"].as_str().unwrap().to_string();
+    assert!(!file.exists());
+    assert_eq!(share["count"], 1);
+    assert_eq!(share["total"], 10);
+    assert_eq!(share["names"][0], "фото.jpg");
+    let web_dir = base.join("data").join("web");
+    assert!(std::fs::read_dir(&web_dir).unwrap().next().is_some());
+    assert_eq!(a.snapshot()["web_shares"].as_array().unwrap().len(), 1);
+
+    a.web_unshare(&id).expect("stop");
+    assert!(a.snapshot()["web_shares"].as_array().unwrap().is_empty());
+    assert!(std::fs::read_dir(&web_dir).unwrap().next().is_none());
+    assert!(a.web_unshare(&id).is_err());
+    assert!(a.web_share(vec![], 30, false).await.is_err());
+
+    a.shutdown().await;
+    let _ = std::fs::remove_dir_all(base);
+}
