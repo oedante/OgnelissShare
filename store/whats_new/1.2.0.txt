@@ -1,0 +1,16 @@
+<ru-RU>
+Ogneliss Share — файлы между своими устройствами напрямую, со сквозным шифрованием, без облака и учётных записей:
+• связывание QR-кодом или ссылкой по почте и в мессенджерах
+• «Мои», «Чужие» устройства и разовый обмен
+• «Отправить всем», буфер обмена, файлы по ссылке
+• передача продолжается после обрыва связи
+• оформление как у Ogneliss Mail, светлая и тёмная темы
+</ru-RU>
+<en-US>
+Ogneliss Share — files between your devices directly, end-to-end encrypted, with no cloud and no accounts:
+• link devices with a QR code or a link by e-mail or messenger
+• My devices, other people’s devices and one-time exchange
+• Send to all, the clipboard, files by link
+• transfers resume after a dropped connection
+• the look of Ogneliss Mail, light and dark themes
+</en-US>

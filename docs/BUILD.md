@@ -1,5 +1,6 @@
 # Сборка для Android и Windows
 
+> Выпуск в Google Play и App Store по шагам — [STORES.md](STORES.md).
 > Android Studio и Xcode — [BUILD_IDE.md](BUILD_IDE.md). macOS, iOS, Linux и
 > выпуск в Google Play, App Store и Microsoft Store —
 > в [RELEASE.md](RELEASE.md).
