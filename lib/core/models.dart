@@ -75,6 +75,7 @@ class Peer {
     required this.online,
     required this.connecting,
     required this.lastSeen,
+    this.via = '',
   });
 
   factory Peer.fromJson(Map<String, dynamic> j) => Peer(
@@ -88,6 +89,7 @@ class Peer {
         online: _bool(j['online']),
         connecting: _bool(j['connecting']),
         lastSeen: _int(j['last_seen']),
+        via: _str(j['via']),
       );
 
   final String id;
@@ -111,6 +113,10 @@ class Peer {
 
   /// Последний раз на связи (секунды Unix).
   final int lastSeen;
+
+  /// Каким путём идут данные: direct — напрямую, relay — через
+  /// ретранслятор, пусто — нет соединения.
+  final String via;
 
   bool get isSession => kind == 'session';
   bool get isOther => kind == 'other';

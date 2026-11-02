@@ -50,6 +50,12 @@ const STALE_AFTER: Duration = Duration::from_secs(7 * 24 * 3600);
 const RETRIES: u32 = 3;
 /// Сколько ждём, пока устройство появится в сети.
 const WAIT_ONLINE: Duration = Duration::from_secs(10 * 60);
+/// Сколько ждём, пока данные снова пойдут. Соединение может оставаться
+/// «живым» (короткие служебные пакеты проходят), а данные стоять: так бывает,
+/// когда VPN на одном из устройств пропускает маленькие пакеты и теряет
+/// большие или путь сменился на нерабочий. Тогда соединение закрывается,
+/// устанавливается заново, и передача продолжается с места остановки.
+const STALL: Duration = Duration::from_secs(40);
 /// Превью текста в снимке состояния; целиком — командой get_text.
 const TEXT_PREVIEW: usize = 2000;
 
@@ -565,6 +571,14 @@ impl Node {
         self.mark_busy(&conn, true);
         let res = self.send_on(&conn, id, files, total, cancel).await;
         self.mark_busy(&conn, false);
+        if let Err(SendErr::Net(e)) = &res
+            && e.to_string() == "stalled"
+        {
+            // Данные стоят, хотя соединение живо: закрыть его — следующая
+            // попытка установит новое, с новыми путями.
+            self.events.log(format!("send {id}: stalled via {}", crate::node::describe_route(&conn)));
+            conn.close(VarInt::from_u32(0), b"stalled");
+        }
         if let Err(SendErr::Net(_)) = &res
             && let Some(code) = crate::node::close_code(&conn)
             && (code == CODE_REMOVED as u64 || code == CODE_NOT_PAIRED as u64)
@@ -697,7 +711,10 @@ impl Node {
             } else {
                 n
             };
-            send.write_all(&buf[..n]).await.map_err(|e| send_err(anyhow!(e)))?;
+            match timeout(STALL, send.write_all(&buf[..n])).await {
+                Ok(r) => r.map_err(|e| send_err(anyhow!(e)))?,
+                Err(_) => return Err(SendErr::Net(anyhow!("stalled"))),
+            }
             hasher.update(&buf[..n]);
             left -= n as u64;
             self.progress(id, n as u64);

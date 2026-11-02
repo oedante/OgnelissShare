@@ -153,6 +153,10 @@ async fn pair_send_text_and_forget() {
     let (a, base_a) = make_node("A").await;
     let (b, base_b) = make_node("B").await;
     pair(&a, &b).await;
+    // Путь данных виден в снимке и записывается в журнал.
+    assert_eq!(a.snapshot()["peers"][0]["via"], "direct");
+    wait_for("путь в журнале", 10, || a.events.log_lines().iter().any(|l| l.contains("path ") && l.contains("*ip:")))
+        .await;
 
     // Файлы и папка от B к A: принимаются без вопросов (свои устройства).
     let src = base_b.join("src");

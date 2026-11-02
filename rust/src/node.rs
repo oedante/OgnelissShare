@@ -213,6 +213,8 @@ pub(crate) struct Link {
     pub dialing: bool,
     pub fails: u32,
     pub next_try: Option<Instant>,
+    /// Каким путём шли данные при прошлой проверке (для журнала).
+    pub route: String,
 }
 
 impl Link {
@@ -865,6 +867,7 @@ impl Node {
                 });
             }
             self.dedupe();
+            self.log_routes();
         }
     }
 
@@ -899,6 +902,30 @@ impl Node {
         });
         for c in to_close {
             c.close(VarInt::from_u32(0), b"duplicate");
+        }
+    }
+
+    /// Записать в журнал смену пути данных: напрямую (и по какому адресу)
+    /// или через ретранслятор. По журналу видно, что происходит при VPN,
+    /// смене сети и пробивке NAT.
+    fn log_routes(&self) {
+        let changes: Vec<String> = self.with(|s| {
+            let mut out = Vec::new();
+            for (id, link) in s.links.iter_mut() {
+                let Some(conn) = link.live() else {
+                    link.route.clear();
+                    continue;
+                };
+                let route = describe_route(&conn);
+                if route != link.route {
+                    out.push(format!("path {}: {route}", id.fmt_short()));
+                    link.route = route;
+                }
+            }
+            out
+        });
+        for c in changes {
+            self.events.log(c);
         }
     }
 
@@ -1626,6 +1653,7 @@ impl Node {
             list.sort_by_key(|p| p.added);
             for p in list {
                 let online = s.is_online(&p.id);
+                let via = route_kind(s, &p.id);
                 let dialing = s.links.get(&p.id).is_some_and(|l| l.dialing);
                 peers.push(json!({
                     "id": p.id.to_string(),
@@ -1637,6 +1665,7 @@ impl Node {
                     "platform": p.platform,
                     "kind": p.trust.as_str(),
                     "online": online,
+                    "via": via,
                     "connecting": dialing && !online,
                     "last_seen": p.last_seen,
                 }));
@@ -1646,6 +1675,7 @@ impl Node {
             sessions.sort_by(|a, b| a.1.cmp(&b.1));
             for (id, name, platform) in sessions {
                 let online = s.is_online(&id);
+                let via = route_kind(s, &id);
                 peers.push(json!({
                     "id": id.to_string(),
                     "code": short_code(&id),
@@ -1653,6 +1683,7 @@ impl Node {
                     "platform": platform,
                     "kind": "session",
                     "online": online,
+                    "via": via,
                     "connecting": false,
                     "last_seen": now_unix(),
                 }));
@@ -1707,6 +1738,33 @@ fn take_into(dir: &Path, paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
         out.push(dest);
     }
     Ok(out)
+}
+
+/// Каким путём сейчас идут данные: «direct» — напрямую, «relay» — через
+/// ретранслятор; None — нет соединения.
+fn route_kind(s: &mut State, id: &EndpointId) -> Option<&'static str> {
+    let conn = s.links.get_mut(id)?.live()?;
+    let paths = conn.paths();
+    let selected = paths.iter().find(|p| p.is_selected())?;
+    Some(if selected.is_relay() { "relay" } else { "direct" })
+}
+
+/// Путь для журнала: выбранный и остальные открытые, с задержкой.
+pub(crate) fn describe_route(conn: &Connection) -> String {
+    let paths = conn.paths();
+    let mut parts: Vec<String> = paths
+        .iter()
+        .map(|p| {
+            format!(
+                "{}{} {}ms",
+                if p.is_selected() { "*" } else { "" },
+                p.remote_addr(),
+                p.rtt().as_millis()
+            )
+        })
+        .collect();
+    parts.sort();
+    if parts.is_empty() { "no paths".into() } else { parts.join(", ") }
 }
 
 /// Пауза перед новой попыткой связаться: 5, 10, 20, 40, 60 секунд с разбросом.

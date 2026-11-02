@@ -3,7 +3,7 @@ Ogneliss Share — файлы между своими устройствами �
 • связывание QR-кодом или ссылкой по почте и в мессенджерах
 • «Мои», «Чужие» устройства и разовый обмен
 • «Отправить всем», буфер обмена, файлы по ссылке
-• передача продолжается после обрыва связи
+• передача продолжается после обрыва связи и не зависает при VPN на одном из устройств
 • оформление как у Ogneliss Mail, светлая и тёмная темы
 </ru-RU>
 <en-US>
@@ -11,6 +11,6 @@ Ogneliss Share — files between your devices directly, end-to-end encrypted, wi
 • link devices with a QR code or a link by e-mail or messenger
 • My devices, other people’s devices and one-time exchange
 • Send to all, the clipboard, files by link
-• transfers resume after a dropped connection
+• transfers resume after a dropped connection and no longer stall with a VPN on one device
 • the look of Ogneliss Mail, light and dark themes
 </en-US>

@@ -193,6 +193,14 @@
   "@connecting": {
     "description": "Состояние устройства"
   },
+  "viaDirect": "directly",
+  "@viaDirect": {
+    "description": "Путь данных: напрямую между устройствами"
+  },
+  "viaRelay": "via relay",
+  "@viaRelay": {
+    "description": "Путь данных: через сервер-ретранслятор (медленнее)"
+  },
   "lastSeen": "last seen {ago}",
   "@lastSeen": {
     "description": "«когда» — «5 мин назад», «вчера»",

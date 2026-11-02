@@ -301,7 +301,13 @@ class _DeviceTile extends StatelessWidget {
   final Peer peer;
 
   String _status() {
-    if (peer.online) return tr.online;
+    if (peer.online) {
+      return switch (peer.via) {
+        'direct' => '${tr.online} · ${tr.viaDirect}',
+        'relay' => '${tr.online} · ${tr.viaRelay}',
+        _ => tr.online,
+      };
+    }
     if (peer.connecting) return tr.connecting;
     if (peer.isSession || peer.lastSeen <= 0) return tr.offline;
     return tr.lastSeen(formatAgo(peer.lastSeen));
