@@ -129,6 +129,8 @@ async fn other_devices_ask_and_can_be_moved() {
     let req = snap["requests"].as_array().unwrap().iter().find(|r| r["kind"] == "offer").unwrap();
     a.respond_offer(req["transfer"].as_str().unwrap(), true).unwrap();
     wait_for("приём", 10, || transfer(&b, &t1)["status"] == "done").await;
+    // «Готово» отправитель видит чуть раньше, чем получатель кладёт файл на место.
+    wait_for("файл у получателя", 10, || base_a.join("dl/doc.txt").exists()).await;
 
     // Перенесли в «Мои» — следующая передача без вопроса.
     a.set_trust(&b.id(), crate::store::Trust::Mine).unwrap();
@@ -136,7 +138,7 @@ async fn other_devices_ask_and_can_be_moved() {
     std::fs::remove_file(base_a.join("dl/doc.txt")).unwrap();
     let t2 = b.send_files(a.id(), vec![src.join("doc.txt")]).unwrap();
     wait_for("приём без вопроса", 10, || transfer(&b, &t2)["status"] == "done").await;
-    assert!(base_a.join("dl/doc.txt").exists());
+    wait_for("файл у получателя", 10, || base_a.join("dl/doc.txt").exists()).await;
     assert!(a.set_trust(&a.id(), crate::store::Trust::Other).is_err());
 }
 
