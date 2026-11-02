@@ -8,6 +8,8 @@
 //!
 //! HTTP/1.1 здесь минимальный и написан вручную: только GET и HEAD, одно
 //! соединение — один ответ (`Connection: close`), докачка через `Range`.
+//! Все файлы раздачи можно забрать одним архивом: ZIP без сжатия собирается
+//! на лету прямо в сокет (`all.zip`), его длина известна заранее.
 
 use std::collections::HashMap;
 use std::io::{self, SeekFrom};
@@ -15,7 +17,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use anyhow::Context;
 use data_encoding::BASE32_NOPAD;
@@ -62,7 +64,7 @@ pub struct ShareInfo {
     pub total: u64,
     /// Первые три имени.
     pub names: Vec<String>,
-    /// Сколько раз файл забрали целиком (каждый файл считается отдельно).
+    /// Сколько раз файл (или весь архив) забрали целиком; каждая отдача считается отдельно.
     pub downloads: u32,
 }
 
@@ -251,6 +253,10 @@ impl WebServer {
                 let html = page(req.ru, &lock(&self.device_name).clone(), &view);
                 reply(stream, "200 OK", "text/html; charset=utf-8", &[], html.as_bytes(), head_only).await
             }
+            // Архив: `all.zip`, а также `all/<имя>.zip` — чтобы браузер показал красивое имя.
+            Some(t) if t == "all.zip" || t.strip_prefix("all/").is_some_and(|r| r.ends_with(".zip")) => {
+                self.send_zip(stream, peer, &view, req).await
+            }
             Some(t) => {
                 let file = t
                     .strip_prefix("f/")
@@ -360,12 +366,95 @@ impl WebServer {
         }
         // Считаем только отдачу с начала и до конца; закрытие соединения — после подсчёта.
         if start == 0 && len == size {
-            if let Some(s) = lock(&self.shares).get_mut(&view.token) {
-                s.downloads += 1;
-            }
-            self.events.changed();
+            self.count_download(&view.token);
         }
         Ok(())
+    }
+
+    /// Все файлы раздачи одним ZIP. Размеры и время берём с диска заранее,
+    /// поэтому длина архива известна до первого байта (`Content-Length`).
+    async fn send_zip(
+        &self,
+        stream: &mut TcpStream,
+        peer: SocketAddr,
+        view: &View,
+        req: &Request,
+    ) -> io::Result<()> {
+        let head_only = req.method == "HEAD";
+        let mut items = Vec::with_capacity(view.files.len());
+        for f in view.files.iter() {
+            // Нет одного из файлов — полного архива не будет; неполный молча не отдаём.
+            let Ok(meta) = tokio::fs::metadata(&f.path).await else {
+                return not_found(stream, req.ru, head_only).await;
+            };
+            if !meta.is_file() {
+                return not_found(stream, req.ru, head_only).await;
+            }
+            let dos = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map_or(DOS_EPOCH, |d| dos_datetime(d.as_secs()));
+            items.push((f.name.clone(), meta.len(), dos));
+        }
+        let entries = zip_layout(items);
+        let title = format!("{}.zip", zip_title(&entries));
+        let disposition = format!(
+            "attachment; filename=\"{}\"; filename*=UTF-8''{}",
+            ascii_fallback(&title),
+            pct_encode(&title)
+        );
+        let content_length = zip_total(&entries).to_string();
+        let headers = [
+            ("Content-Type", "application/zip"),
+            ("Content-Disposition", &disposition),
+            ("Content-Length", &content_length),
+            ("Accept-Ranges", "none"),
+            ("Cache-Control", "no-store"),
+        ];
+        put(stream, head("200 OK", &headers).as_bytes()).await?;
+        if head_only {
+            return Ok(());
+        }
+
+        self.events.emit(json!({"type": "web_download", "share": view.id, "name": title}));
+        self.events.log(format!("web {}: GET zip from {}", view.id, peer.ip()));
+
+        let mut buf = vec![0u8; CHUNK];
+        let mut crcs = Vec::with_capacity(entries.len());
+        for (e, f) in entries.iter().zip(view.files.iter()) {
+            put(stream, &zip_local(e)).await?;
+            let mut file = File::open(&f.path).await?;
+            let (mut crc, mut left) = (0u32, e.size);
+            while left > 0 {
+                let want = left.min(CHUNK as u64) as usize;
+                let n = file.read(&mut buf[..want]).await?;
+                if n == 0 {
+                    // Файл стал короче: рвём соединение, а не отдаём испорченный архив.
+                    return Err(io::ErrorKind::UnexpectedEof.into());
+                }
+                crc = crc32_update(crc, &buf[..n]);
+                put(stream, &buf[..n]).await?;
+                left -= n as u64;
+            }
+            // Файл не должен стать длиннее заявленного: иначе размер в архиве не совпадёт с данными.
+            if file.read(&mut buf[..1]).await? != 0 {
+                return Err(io::ErrorKind::InvalidData.into());
+            }
+            put(stream, &zip_descriptor(e, crc)).await?;
+            crcs.push(crc);
+        }
+        put(stream, &zip_central(&entries, &crcs)).await?;
+        self.count_download(&view.token);
+        Ok(())
+    }
+
+    /// Файл (или архив) отдан целиком: +1 к счётчику и обновить интерфейс.
+    fn count_download(&self, token: &str) {
+        if let Some(s) = lock(&self.shares).get_mut(token) {
+            s.downloads += 1;
+        }
+        self.events.changed();
     }
 }
 
@@ -601,11 +690,279 @@ fn human_size(n: u64, ru: bool) -> String {
     if ru { s.replace('.', ",") } else { s }
 }
 
+// ---------------------------------------------------------------- ZIP
+
+// Формат: каждый файл — локальный заголовок, данные без сжатия, дескриптор
+// данных; в конце — центральный каталог. CRC32 неизвестен заранее, поэтому он
+// идёт в дескрипторе (бит 3), а размеры файлов известны, и длину архива можно
+// посчитать до отправки. Всё, что не помещается в 32 бита, пишется в ZIP64.
+
+/// Бит 3: CRC и размеры после данных. Бит 11: имена в UTF-8.
+const ZIP_FLAGS: u16 = 0x0808;
+/// Значение 0xFFFFFFFF в 32-битном поле означает «смотри ZIP64».
+const Z32: u64 = 0xFFFF_FFFF;
+/// 1980-01-01 00:00 — когда времени изменения файла нет.
+const DOS_EPOCH: (u16, u16) = (0, (1 << 5) | 1);
+/// Имя архива, если у файлов нет общей папки верхнего уровня.
+const ZIP_DEFAULT_NAME: &str = "Ogneliss Share";
+
+/// Запись чисел в формате ZIP (младший байт первым).
+trait PutLe {
+    fn u16(&mut self, v: u16);
+    fn u32(&mut self, v: u32);
+    fn u64(&mut self, v: u64);
+}
+
+impl PutLe for Vec<u8> {
+    fn u16(&mut self, v: u16) {
+        self.extend_from_slice(&v.to_le_bytes());
+    }
+    fn u32(&mut self, v: u32) {
+        self.extend_from_slice(&v.to_le_bytes());
+    }
+    fn u64(&mut self, v: u64) {
+        self.extend_from_slice(&v.to_le_bytes());
+    }
+}
+
+struct ZipEntry {
+    /// Имя внутри архива: UTF-8, разделитель «/», без «..» и ведущего «/».
+    name: String,
+    size: u64,
+    dos_time: u16,
+    dos_date: u16,
+    /// Где в архиве начинается локальный заголовок.
+    offset: u64,
+}
+
+impl ZipEntry {
+    /// Размер не помещается в 32 бита: заголовок и дескриптор в формате ZIP64.
+    fn big(&self) -> bool {
+        self.size >= Z32
+    }
+
+    fn local_len(&self) -> u64 {
+        30 + self.name.len() as u64 + if self.big() { 20 } else { 0 }
+    }
+
+    fn descriptor_len(&self) -> u64 {
+        if self.big() { 24 } else { 16 }
+    }
+
+    /// Смещение первого байта после этой записи (вместе с дескриптором).
+    fn end(&self) -> u64 {
+        self.offset + self.local_len() + self.size + self.descriptor_len()
+    }
+}
+
+/// Таблица CRC-32 (IEEE, как в ZIP, PNG и gzip), собирается при компиляции.
+const CRC_TABLE: [u32; 256] = {
+    let mut table = [0u32; 256];
+    let mut i = 0;
+    while i < 256 {
+        let mut c = i as u32;
+        let mut k = 0;
+        while k < 8 {
+            c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+            k += 1;
+        }
+        table[i] = c;
+        i += 1;
+    }
+    table
+};
+
+/// Продолжить CRC-32 на следующем куске данных (начинать с 0).
+fn crc32_update(crc: u32, data: &[u8]) -> u32 {
+    let mut c = !crc;
+    for &b in data {
+        c = CRC_TABLE[((c ^ b as u32) & 0xFF) as usize] ^ (c >> 8);
+    }
+    !c
+}
+
+/// Время ZIP (MS-DOS): `(время, дата)` по UTC; вне 1980–2107 — `DOS_EPOCH`.
+fn dos_datetime(unix: u64) -> (u16, u16) {
+    // Дата по числу дней с 1970-01-01 (алгоритм Говарда Хиннанта).
+    let z = (unix / 86400) as i64 + 719_468;
+    let era = z / 146_097;
+    let doe = z % 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    if !(1980..=2107).contains(&year) {
+        return DOS_EPOCH;
+    }
+    let secs = (unix % 86400) as i64;
+    let time = (secs / 3600) << 11 | (secs % 3600 / 60) << 5 | (secs % 60 / 2);
+    (time as u16, ((year - 1980) << 9 | month << 5 | day) as u16)
+}
+
+/// Имя файла внутри архива: без ведущего «/», пустых сегментов и «..».
+fn zip_name(name: &str) -> String {
+    let parts: Vec<&str> = name
+        .split(['/', '\\'])
+        .filter(|p| !p.is_empty() && *p != ".")
+        .map(|p| if p == ".." { "_" } else { p })
+        .collect();
+    let mut s = if parts.is_empty() { "file".to_string() } else { parts.join("/") };
+    // Длина имени в заголовке — 16 бит.
+    while s.len() > 0xFFFF {
+        s.pop();
+    }
+    s
+}
+
+/// Записи архива по списку `(имя, размер, время)` с вычисленными смещениями.
+fn zip_layout(items: Vec<(String, u64, (u16, u16))>) -> Vec<ZipEntry> {
+    let mut offset = 0;
+    items
+        .into_iter()
+        .map(|(name, size, (dos_time, dos_date))| {
+            let e = ZipEntry { name: zip_name(&name), size, dos_time, dos_date, offset };
+            offset = e.end();
+            e
+        })
+        .collect()
+}
+
+/// Имя архива без «.zip»: общая папка верхнего уровня, иначе «Ogneliss Share».
+fn zip_title(entries: &[ZipEntry]) -> String {
+    fn top(e: &ZipEntry) -> Option<&str> {
+        e.name.split_once('/').map(|(t, _)| t)
+    }
+    match entries.first().and_then(top) {
+        Some(t) if entries.iter().all(|e| top(e) == Some(t)) => t.to_string(),
+        _ => ZIP_DEFAULT_NAME.to_string(),
+    }
+}
+
+/// Локальный заголовок: CRC и размеры нулевые, настоящие придут в дескрипторе.
+fn zip_local(e: &ZipEntry) -> Vec<u8> {
+    let big = e.big();
+    let mut h = Vec::with_capacity(e.local_len() as usize);
+    h.u32(0x0403_4B50);
+    h.u16(if big { 45 } else { 20 });
+    h.u16(ZIP_FLAGS);
+    h.u16(0); // без сжатия
+    h.u16(e.dos_time);
+    h.u16(e.dos_date);
+    h.u32(0);
+    let sizes = if big { u32::MAX } else { 0 };
+    h.u32(sizes);
+    h.u32(sizes);
+    h.u16(e.name.len() as u16);
+    h.u16(if big { 20 } else { 0 });
+    h.extend_from_slice(e.name.as_bytes());
+    if big {
+        // Признак ZIP64: дескриптор будет с 8-байтными размерами.
+        h.u16(1);
+        h.u16(16);
+        h.u64(0);
+        h.u64(0);
+    }
+    h
+}
+
+/// Дескриптор данных: CRC и размер сразу после содержимого файла.
+fn zip_descriptor(e: &ZipEntry, crc: u32) -> Vec<u8> {
+    let mut d = Vec::with_capacity(24);
+    d.u32(0x0807_4B50);
+    d.u32(crc);
+    if e.big() {
+        d.u64(e.size);
+        d.u64(e.size);
+    } else {
+        d.u32(e.size as u32);
+        d.u32(e.size as u32);
+    }
+    d
+}
+
+/// Центральный каталог и концевые записи (с ZIP64, если что-то не влезло в 32 бита или 16 бит).
+fn zip_central(entries: &[ZipEntry], crcs: &[u32]) -> Vec<u8> {
+    let mut cd = Vec::new();
+    for (e, &crc) in entries.iter().zip(crcs) {
+        let (big, far) = (e.big(), e.offset >= Z32);
+        let extra_len: u16 =
+            if big || far { 4 + if big { 16 } else { 0 } + if far { 8 } else { 0 } } else { 0 };
+        let version = if big || far { 45 } else { 20 };
+        cd.u32(0x0201_4B50);
+        cd.u16(version); // создано в версии
+        cd.u16(version); // нужна версия
+        cd.u16(ZIP_FLAGS);
+        cd.u16(0);
+        cd.u16(e.dos_time);
+        cd.u16(e.dos_date);
+        cd.u32(crc);
+        let size32 = if big { u32::MAX } else { e.size as u32 };
+        cd.u32(size32);
+        cd.u32(size32);
+        cd.u16(e.name.len() as u16);
+        cd.u16(extra_len);
+        cd.u16(0); // комментарий
+        cd.u16(0); // номер диска
+        cd.u16(0); // внутренние атрибуты
+        cd.u32(0); // внешние атрибуты
+        cd.u32(if far { u32::MAX } else { e.offset as u32 });
+        cd.extend_from_slice(e.name.as_bytes());
+        if extra_len > 0 {
+            cd.u16(1);
+            cd.u16(extra_len - 4);
+            if big {
+                cd.u64(e.size);
+                cd.u64(e.size);
+            }
+            if far {
+                cd.u64(e.offset);
+            }
+        }
+    }
+    let count = entries.len() as u64;
+    let cd_offset = entries.last().map_or(0, ZipEntry::end);
+    let cd_size = cd.len() as u64;
+    let zip64 = count >= 0xFFFF || cd_offset >= Z32 || cd_size >= Z32 || entries.iter().any(ZipEntry::big);
+    if zip64 {
+        // Запись ZIP64 и указатель на неё; обычная концевая запись ниже содержит «заглушки».
+        cd.u32(0x0606_4B50);
+        cd.u64(44);
+        cd.u16(45);
+        cd.u16(45);
+        cd.u32(0);
+        cd.u32(0);
+        cd.u64(count);
+        cd.u64(count);
+        cd.u64(cd_size);
+        cd.u64(cd_offset);
+        cd.u32(0x0706_4B50);
+        cd.u32(0);
+        cd.u64(cd_offset + cd_size);
+        cd.u32(1);
+    }
+    cd.u32(0x0605_4B50);
+    cd.u16(0);
+    cd.u16(0);
+    cd.u16(count.min(0xFFFF) as u16);
+    cd.u16(count.min(0xFFFF) as u16);
+    cd.u32(cd_size.min(u32::MAX.into()) as u32);
+    cd.u32(cd_offset.min(u32::MAX.into()) as u32);
+    cd.u16(0);
+    cd
+}
+
+/// Длина архива целиком: записи, центральный каталог и концевые записи.
+fn zip_total(entries: &[ZipEntry]) -> u64 {
+    entries.last().map_or(0, ZipEntry::end) + zip_central(entries, &vec![0; entries.len()]).len() as u64
+}
+
 // ---------------------------------------------------------------- страницы
 
 const CSS: &str = "\
-:root{--p:#1D4F91;--bg:#F2F5F9;--card:#fff;--tx:#14181d;--mu:#5b6673;--on:#fff;color-scheme:light dark}\
-@media(prefers-color-scheme:dark){:root{--p:#9DBDEB;--bg:#12161B;--card:#1D232B;--tx:#e8edf3;--mu:#9aa6b4;--on:#12161B}}\
+:root{--p:#1D4F91;--bg:#F2F5F9;--card:#fff;--tx:#14181d;--mu:#5b6673;--on:#fff;--tb:#D9E5F6;--tt:#0B2545;color-scheme:light dark}\
+@media(prefers-color-scheme:dark){:root{--p:#9DBDEB;--bg:#12161B;--card:#1D232B;--tx:#e8edf3;--mu:#9aa6b4;--on:#12161B;--tb:#233E63;--tt:#D9E5F6}}\
 *{box-sizing:border-box}\
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}\
 main{max-width:560px;margin:0 auto;padding:24px 16px 32px}\
@@ -617,6 +974,8 @@ li{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 1px 3px r
 .n{font-weight:600;overflow-wrap:anywhere}\
 .s{margin:2px 0 12px;color:var(--mu);font-size:14px}\
 .b{display:block;padding:14px;border-radius:12px;background:var(--p);color:var(--on);font-weight:600;text-align:center;text-decoration:none}\
+.t{background:var(--tb);color:var(--tt)}\
+.z{margin:0 0 12px;padding:18px 14px;font-size:17px}\
 footer{margin-top:24px;color:var(--mu);font-size:13px;text-align:center}\
 footer a{color:var(--p)}";
 
@@ -642,32 +1001,42 @@ fn layout(ru: bool, inner: &str) -> String {
 fn page(ru: bool, device: &str, view: &View) -> String {
     let device = escape_html(device);
     let mins = view.left.as_secs().div_ceil(60).max(1);
-    let (from, valid, button, hint) = if ru {
+    let total = view.files.iter().fold(0u64, |a, f| a.saturating_add(f.size));
+    let (from, valid, button, zip, hint) = if ru {
         (
             format!("Файлы с устройства «{device}»"),
             format!("Ссылка действует ещё {mins} мин"),
             "Скачать",
-            "Нажмите на каждый файл",
+            format!("Скачать всё одним архивом (ZIP, {})", human_size(total, ru)),
+            "Или скачайте файлы по одному",
         )
     } else {
         (
             format!("Files from “{device}”"),
             format!("Link valid for {mins} more min"),
             "Download",
-            "Tap each file to download",
+            format!("Download all as one ZIP ({})", human_size(total, ru)),
+            "Or download files one by one",
         )
     };
+    // При архиве главная кнопка — он, у отдельных файлов кнопки спокойнее.
+    let class = if view.files.len() > 1 { "b t" } else { "b" };
     let mut items = String::new();
     for (i, f) in view.files.iter().enumerate() {
         items.push_str(&format!(
-            "<li><div class=\"n\">{}</div><div class=\"s\">{}</div><a class=\"b\" href=\"f/{i}/{}\">{button}</a></li>",
+            "<li><div class=\"n\">{}</div><div class=\"s\">{}</div><a class=\"{class}\" href=\"f/{i}/{}\">{button}</a></li>",
             escape_html(&f.name),
             human_size(f.size, ru),
             pct_encode(basename(&f.name)),
         ));
     }
-    let hint = if view.files.len() > 1 { format!("<p class=\"mu\">{hint}</p>") } else { String::new() };
-    layout(ru, &format!("<p class=\"sub\">{from}</p><p class=\"mu\">{valid}</p><ul>{items}</ul>{hint}"))
+    // Архив предлагаем, когда файлов больше одного; кнопки отдельных файлов остаются ниже.
+    let all = if view.files.len() > 1 {
+        format!("<a class=\"b z\" href=\"all.zip\">{zip}</a><p class=\"mu\">{hint}</p>")
+    } else {
+        String::new()
+    };
+    layout(ru, &format!("<p class=\"sub\">{from}</p><p class=\"mu\">{valid}</p>{all}<ul>{items}</ul>"))
 }
 
 #[cfg(test)]
@@ -687,7 +1056,11 @@ mod tests {
 
     impl Fx {
         fn url(&self, tail: &str) -> String {
-            format!("/s/{}/{tail}", self.info.token)
+            self.url_of(&self.info, tail)
+        }
+
+        fn url_of(&self, info: &ShareInfo, tail: &str) -> String {
+            format!("/s/{}/{tail}", info.token)
         }
     }
 
@@ -753,7 +1126,11 @@ mod tests {
         assert!(html.contains("Фото/IMG_1.jpg") && html.contains("Документ №1.txt"));
         assert!(html.contains("docs/&lt;b&gt;x&lt;/b&gt;.txt") && !html.contains("<b>"));
         assert!(html.contains("Пикси &lt;3&gt;"));
-        assert!(html.contains("Скачать") && html.contains("Нажмите на каждый файл"));
+        assert!(html.contains("Скачать") && html.contains("Или скачайте файлы по одному"));
+        assert!(
+            html.contains("<a class=\"b z\" href=\"all.zip\">Скачать всё одним архивом (ZIP, 586,0 КБ)</a>")
+        );
+        assert!(html.find("all.zip") < html.find("<ul>"));
         assert!(html.contains("Ссылка действует ещё 10 мин"), "{html}");
         assert!(html.contains("585,9 КБ"));
         assert!(html.contains("href=\"f/0/IMG_1.jpg\""));
@@ -763,7 +1140,8 @@ mod tests {
 
         let (_, body) = req(&fx, "GET", &fx.url(""), "Accept-Language: en-US,en;q=0.9\r\n").await;
         let html = String::from_utf8(body).unwrap();
-        assert!(html.contains("Download") && html.contains("Tap each file to download"));
+        assert!(html.contains("Download") && html.contains("Or download files one by one"));
+        assert!(html.contains("Download all as one ZIP (586.0 KB)"));
         assert!(html.contains("585.9 KB") && html.contains("Link valid for 10 more min"));
     }
 
@@ -918,6 +1296,275 @@ mod tests {
         assert_eq!(fx.info.total, SIZE as u64 + 5 + "привет".len() as u64);
         let ids: Vec<String> = fx.srv.list().into_iter().map(|i| i.id).collect();
         assert_eq!(ids, [second.id, fx.info.id.clone()]);
+    }
+
+    /// Новая раздача из файлов `(имя на диске, имя для получателя, содержимое)`.
+    fn share(fx: &Fx, files: &[(&str, &str, &[u8])]) -> ShareInfo {
+        let list = files
+            .iter()
+            .map(|(disk, name, bytes)| {
+                let path = fx.dir.join(disk);
+                std::fs::write(&path, bytes).unwrap();
+                WebFile { path, name: name.to_string(), size: bytes.len() as u64 }
+            })
+            .collect();
+        fx.srv.add(list, Duration::from_secs(600))
+    }
+
+    fn downloads(fx: &Fx, id: &str) -> u32 {
+        fx.srv.list().iter().find(|i| i.id == id).unwrap().downloads
+    }
+
+    fn le16(b: &[u8], at: usize) -> usize {
+        u16::from_le_bytes(b[at..at + 2].try_into().unwrap()) as usize
+    }
+
+    fn le32(b: &[u8], at: usize) -> u32 {
+        u32::from_le_bytes(b[at..at + 4].try_into().unwrap())
+    }
+
+    fn le64(b: &[u8], at: usize) -> u64 {
+        u64::from_le_bytes(b[at..at + 8].try_into().unwrap())
+    }
+
+    /// Разбор архива без ZIP64 по центральному каталогу, со сверкой локальных
+    /// заголовков и дескрипторов: `(имя, содержимое, CRC)`.
+    fn read_zip(z: &[u8]) -> Vec<(String, Vec<u8>, u32)> {
+        let eocd = z.len() - 22;
+        assert_eq!(le32(z, eocd), 0x0605_4B50);
+        let (count, cd_size, cd_off) =
+            (le16(z, eocd + 10), le32(z, eocd + 12) as usize, le32(z, eocd + 16) as usize);
+        assert_eq!(cd_off + cd_size, eocd);
+        let (mut out, mut p, mut next) = (Vec::new(), cd_off, 0);
+        for _ in 0..count {
+            assert_eq!(le32(z, p), 0x0201_4B50);
+            assert_eq!((le16(z, p + 8), le16(z, p + 10)), (0x0808, 0), "флаги и метод");
+            let (crc, size) = (le32(z, p + 16), le32(z, p + 24) as usize);
+            assert_eq!(le32(z, p + 20) as usize, size);
+            let (name_len, extra_len, comment_len, local) =
+                (le16(z, p + 28), le16(z, p + 30), le16(z, p + 32), le32(z, p + 42) as usize);
+            let name = String::from_utf8(z[p + 46..p + 46 + name_len].to_vec()).unwrap();
+            p += 46 + name_len + extra_len + comment_len;
+
+            assert_eq!(local, next, "записи идут подряд");
+            assert_eq!((le32(z, local), le16(z, local + 6)), (0x0403_4B50, 0x0808));
+            assert_eq!(le32(z, local + 14), 0, "CRC в локальном заголовке нулевой");
+            let local_name = le16(z, local + 26);
+            assert_eq!(&z[local + 30..local + 30 + local_name], name.as_bytes());
+            let data_at = local + 30 + local_name + le16(z, local + 28);
+            let d = data_at + size;
+            let descriptor = [le32(z, d), le32(z, d + 4), le32(z, d + 8), le32(z, d + 12)];
+            assert_eq!(descriptor, [0x0807_4B50, crc, size as u32, size as u32]);
+            next = d + 16;
+            out.push((name, z[data_at..d].to_vec(), crc));
+        }
+        assert_eq!(next, cd_off, "каталог сразу после последней записи");
+        out
+    }
+
+    /// Проверка архива системным `unzip -t`; если его нет — пропускаем.
+    fn unzip_test(zip: &Path) {
+        match std::process::Command::new("unzip").arg("-tq").arg(zip).output() {
+            Ok(out) => assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stdout)),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => panic!("{e}"),
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn zip_download_is_valid() {
+        let fx = setup(Duration::from_secs(600)).await;
+        let items: [(&str, &str, &[u8]); 3] = [
+            ("z1.bin", "Фото/IMG_1.jpg", &fx.data),
+            ("z2.txt", "Документ №1.txt", "привет".as_bytes()),
+            ("z3.txt", "Фото/пусто.txt", b""),
+        ];
+        let info = share(&fx, &items);
+        // Range для архива не поддерживается: заголовок игнорируется, отдаётся всё.
+        let (head, body) = req(&fx, "GET", &fx.url_of(&info, "all.zip"), "Range: bytes=5-\r\n").await;
+        assert!(head.starts_with("HTTP/1.1 200"), "{head}");
+        assert_eq!(header(&head, "content-type"), Some("application/zip"));
+        assert_eq!(header(&head, "accept-ranges"), Some("none"));
+        assert_eq!(header(&head, "content-length"), Some(body.len().to_string().as_str()));
+        assert_eq!(
+            header(&head, "content-disposition"),
+            Some("attachment; filename=\"Ogneliss Share.zip\"; filename*=UTF-8''Ogneliss%20Share.zip")
+        );
+
+        let files = read_zip(&body);
+        assert_eq!(files.len(), 3);
+        for ((name, data, crc), (_, want_name, want)) in files.iter().zip(&items) {
+            assert_eq!(name, want_name);
+            assert_eq!(data, want);
+            assert_eq!(*crc, crc32_update(0, want));
+        }
+
+        assert_eq!(downloads(&fx, &info.id), 1);
+        let events = fx.events.poll()["events"].clone();
+        assert_eq!(events[0]["type"], "web_download");
+        assert_eq!(events[0]["share"], info.id.as_str());
+        assert_eq!(events[0]["name"], "Ogneliss Share.zip");
+        let log = format!("web {}: GET zip from 127.0.0.1", info.id);
+        assert!(fx.events.log_lines().iter().any(|l| l.ends_with(&log)));
+
+        let path = fx.dir.join("all.zip");
+        std::fs::write(&path, &body).unwrap();
+        unzip_test(&path);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn zip_name_head_and_page_button() {
+        let fx = setup(Duration::from_secs(600)).await;
+        // Общая папка → имя архива; «..» и ведущий «/» в именах обезврежены.
+        let info = share(&fx, &[("p.txt", "Фото/a.txt", b"a"), ("q.txt", "/Фото/../etc/b.txt", b"bb")]);
+        let (head, body) = req(&fx, "HEAD", &fx.url_of(&info, "all/%D0%BB.zip"), "").await;
+        assert!(head.starts_with("HTTP/1.1 200") && body.is_empty(), "{head}");
+        assert_eq!(
+            header(&head, "content-disposition"),
+            Some("attachment; filename=\"____.zip\"; filename*=UTF-8''%D0%A4%D0%BE%D1%82%D0%BE.zip")
+        );
+        assert_eq!(downloads(&fx, &info.id), 0);
+        assert!(fx.events.poll()["events"].as_array().unwrap().is_empty());
+
+        let (head2, body) = req(&fx, "GET", &fx.url_of(&info, "all/x.zip"), "").await;
+        assert_eq!(header(&head, "content-length"), header(&head2, "content-length"));
+        assert_eq!(header(&head2, "content-length"), Some(body.len().to_string().as_str()));
+        let names: Vec<String> = read_zip(&body).into_iter().map(|f| f.0).collect();
+        assert_eq!(names, ["Фото/a.txt", "Фото/_/etc/b.txt"]);
+
+        // Одному файлу архив не нужен: кнопки на странице нет.
+        let one = share(&fx, &[("s.txt", "one.txt", b"x")]);
+        let (_, body) = req(&fx, "GET", &fx.url_of(&one, ""), "").await;
+        assert!(!String::from_utf8(body).unwrap().contains("all.zip"));
+
+        // Недоступный файл — архива нет, а не неполный архив.
+        std::fs::remove_file(fx.dir.join("q.txt")).unwrap();
+        let (head, _) = req(&fx, "GET", &fx.url_of(&info, "all.zip"), "").await;
+        assert!(head.starts_with("HTTP/1.1 404"), "{head}");
+    }
+
+    /// Файл меняется посреди отдачи архива: соединение рвётся, архив не доходит до конца.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn zip_aborts_when_file_changes() {
+        const BIG: u64 = 40 << 20;
+        for (case, change) in [("короче", true), ("длиннее", false)] {
+            let fx = setup(Duration::from_secs(600)).await;
+            let path = fx.dir.join("big.bin");
+            std::fs::File::create(&path).unwrap().set_len(BIG).unwrap();
+            let info = fx.srv.add(
+                vec![WebFile { path: path.clone(), name: "big.bin".into(), size: BIG }],
+                Duration::from_secs(600),
+            );
+            let mut s = TcpStream::connect(("127.0.0.1", fx.srv.port())).await.unwrap();
+            let request = format!("GET {} HTTP/1.1\r\nHost: x\r\n\r\n", fx.url_of(&info, "all.zip"));
+            s.write_all(request.as_bytes()).await.unwrap();
+            // Читаем самое начало: остальное не влезает в буферы сокета, сервер ждёт нас.
+            let mut out = vec![0u8; 4096];
+            let n = s.read(&mut out).await.unwrap();
+            out.truncate(n);
+            if change {
+                std::fs::OpenOptions::new().write(true).truncate(true).open(&path).unwrap();
+            } else {
+                use std::io::Write;
+                std::fs::OpenOptions::new().append(true).open(&path).unwrap().write_all(b"+").unwrap();
+            }
+            s.read_to_end(&mut out).await.unwrap();
+            let end = out.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
+            let head = String::from_utf8_lossy(&out[..end]).into_owned();
+            let want: usize = header(&head, "content-length").unwrap().parse().unwrap();
+            assert!(out.len() - end - 4 < want, "{case}: архив оборван, а не дописан до конца");
+            assert_eq!(downloads(&fx, &info.id), 0, "{case}");
+        }
+    }
+
+    #[test]
+    fn zip_primitives() {
+        // Эталон CRC-32 («check value») и продолжение по кускам.
+        assert_eq!(crc32_update(0, b"123456789"), 0xCBF4_3926);
+        assert_eq!(crc32_update(crc32_update(0, b"1234"), b"56789"), 0xCBF4_3926);
+        assert_eq!(crc32_update(0, b""), 0);
+
+        // 2023-11-14 22:13:20 и високосный день 2024-02-29; до 1980 года — запасная дата.
+        assert_eq!(dos_datetime(1_700_000_000), ((22 << 11) | (13 << 5) | 10, (43 << 9) | (11 << 5) | 14));
+        assert_eq!(dos_datetime(1_709_164_800), (0, (44 << 9) | (2 << 5) | 29));
+        assert_eq!(dos_datetime(0), DOS_EPOCH);
+
+        assert_eq!(zip_name("Фото/IMG_1.jpg"), "Фото/IMG_1.jpg");
+        assert_eq!(zip_name("/a//b/./c.txt"), "a/b/c.txt");
+        assert_eq!(zip_name("../../x\\..\\y"), "_/_/x/_/y");
+        assert_eq!(zip_name("///"), "file");
+        assert_eq!(zip_name(&"я".repeat(40_000)).len(), 0xFFFE);
+    }
+
+    /// Структуры ZIP64 на «выдуманных» размерах: настоящие файлы по 4 ГиБ в тесте не нужны.
+    #[test]
+    fn zip64_structures() {
+        let gib = 1u64 << 30;
+        let items = [10, 5 * gib, 10, 0xFFFF_FFFF].map(|s| ("f".to_string(), s, DOS_EPOCH)).to_vec();
+        let e = zip_layout(items);
+        assert!(!e[0].big() && e[1].big() && !e[2].big() && e[3].big(), "0xFFFFFFFF уже ZIP64");
+        assert!(e[1].offset < Z32 && e[2].offset >= Z32 && e[3].offset >= Z32);
+        // Локальный заголовок и дескриптор больших записей: ZIP64.
+        assert_eq!((zip_local(&e[0]).len(), zip_local(&e[1]).len()), (31, 51));
+        assert_eq!((zip_descriptor(&e[0], 7).len(), zip_descriptor(&e[1], 7).len()), (16, 24));
+
+        let central = zip_central(&e, &[1, 2, 3, 4]);
+        assert_eq!(zip_total(&e), e[3].end() + central.len() as u64);
+        // Дополнительные поля: ничего / размеры / смещение / размеры и смещение.
+        let (mut p, mut extras) = (0, Vec::new());
+        for entry in &e {
+            assert_eq!(le32(&central, p), 0x0201_4B50);
+            let (name_len, extra_len) = (le16(&central, p + 28), le16(&central, p + 30));
+            extras.push(extra_len);
+            if extra_len > 0 {
+                let x = p + 46 + name_len;
+                assert_eq!((le16(&central, x), le16(&central, x + 2)), (1, extra_len - 4));
+                // Смещение — всегда последнее поле дополнения.
+                if entry.offset >= Z32 {
+                    assert_eq!(le64(&central, x + extra_len - 8), entry.offset);
+                }
+                if entry.big() {
+                    assert_eq!((le64(&central, x + 4), le64(&central, x + 12)), (entry.size, entry.size));
+                }
+            }
+            p += 46 + name_len + extra_len;
+        }
+        assert_eq!(extras, [0, 20, 12, 28]);
+
+        // Концевые записи: ZIP64 (56 байт), указатель на неё (20) и обычная (22) с заглушками.
+        let (cd_size, n) = (p as u64, central.len());
+        assert_eq!(n, p + 56 + 20 + 22);
+        let (z64, loc, end) = (&central[p..], &central[p + 56..], &central[p + 76..]);
+        assert_eq!((le32(z64, 0), le64(z64, 4)), (0x0606_4B50, 44));
+        assert_eq!((le64(z64, 24), le64(z64, 32)), (4, 4));
+        assert_eq!((le64(z64, 40), le64(z64, 48)), (cd_size, e[3].end()));
+        assert_eq!((le32(loc, 0), le64(loc, 8), le32(loc, 16)), (0x0706_4B50, e[3].end() + cd_size, 1));
+        assert_eq!(
+            (le32(end, 0), le16(end, 10), le32(end, 12), le32(end, 16)),
+            (0x0605_4B50, 4, p as u32, u32::MAX)
+        );
+    }
+
+    /// Больше 65535 записей: счётчик в обычной концевой записи — заглушка, число в ZIP64.
+    #[test]
+    fn zip_many_entries() {
+        let items = (0..70_000).map(|i| (format!("d/{i}.txt"), 0, DOS_EPOCH)).collect();
+        let e = zip_layout(items);
+        let mut z = Vec::new();
+        for x in &e {
+            z.extend(zip_local(x));
+            z.extend(zip_descriptor(x, 0));
+        }
+        z.extend(zip_central(&e, &vec![0; e.len()]));
+        assert_eq!(z.len() as u64, zip_total(&e));
+        let end = z.len() - 22;
+        assert_eq!((le16(&z, end + 8), le16(&z, end + 10)), (0xFFFF, 0xFFFF));
+        assert_eq!((le64(&z, end - 20 - 56 + 24), le64(&z, end - 20 - 56 + 32)), (70_000, 70_000));
+
+        let path = std::env::temp_dir().join(format!("osh-zip-{}.zip", random_id()));
+        std::fs::write(&path, &z).unwrap();
+        unzip_test(&path);
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
