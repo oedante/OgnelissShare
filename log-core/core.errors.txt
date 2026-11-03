@@ -1,0 +1,12 @@
+19:  Downloaded n0-error-macros v1.0.1
+31:  Downloaded n0-error v1.0.1
+279:  Downloaded thiserror v2.0.21
+294:  Downloaded thiserror-impl v2.0.21
+417:   Compiling thiserror v2.0.21
+424:   Compiling thiserror-impl v2.0.21
+464:   Compiling n0-error-macros v1.0.1
+471:   Compiling n0-error v1.0.1
+697:test result: ok. 48 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 8.51s
+703:test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+773:    Checking thiserror v2.0.21
+812:    Checking n0-error v1.0.1

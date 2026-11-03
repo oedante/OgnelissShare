@@ -1,0 +1,10 @@
+commit: 54a48e359f8d416a6cf09211e5cfe30c681d2553
+ref: main
+run: https://github.com/oedante/OgnelissShare/actions/runs/41599103615
+core: success
+dart: success
+android: success
+linux: success
+windows: success
+macos: success
+ios: success
