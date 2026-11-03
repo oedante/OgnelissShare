@@ -1,0 +1,29 @@
+[package]
+name = "ogneliss-signal"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+description = "Служба связи Ogneliss Share: почтовый ящик для зашифрованных SDP (WebRTC), без хранения на диске"
+publish = false
+
+# Отдельный пакет: не входит в workspace rust/ и собирается сам по себе.
+[workspace]
+
+[dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "query", "json"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "signal"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+rand = "0.10"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

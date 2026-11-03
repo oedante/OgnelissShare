@@ -1,0 +1,6 @@
+target
+.git
+tests
+README.md
+docker-compose.example.yml
+nginx-signal.conf

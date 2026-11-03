@@ -1,0 +1,47 @@
+# Служба связи для ссылок «без приложения» (server/signal, docs/WEB_P2P.md):
+# проверки и сборка образа Docker. Образ никуда не загружается — на сервере
+# его собирают из исходников (server/signal/README.md); здесь проверяем, что
+# Dockerfile собирается.
+
+name: Служба связи
+
+on:
+  push:
+    branches: ['**']
+    paths: ['server/signal/**', '.github/workflows/signal.yml']
+  pull_request:
+    paths: ['server/signal/**']
+  workflow_dispatch:
+
+concurrency:
+  group: signal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Проверки и образ
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Rust stable
+        run: rustup update stable && rustup default stable && rustup component add clippy
+      - name: Тесты
+        working-directory: server/signal
+        run: cargo test --locked
+      - name: Clippy
+        working-directory: server/signal
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Образ Docker
+        working-directory: server/signal
+        run: |
+          docker build -t ogneliss-signal .
+          docker run -d --name sig -p 18080:8080 ogneliss-signal
+          ok=0
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:18080/share/api/v1/health; then ok=1; break; fi
+            sleep 0.5
+          done
+          [ "$ok" = 1 ] || { docker logs sig; exit 1; }
+          docker images ogneliss-signal --format 'Размер образа: {{.Size}}'
+          docker rm -f sig

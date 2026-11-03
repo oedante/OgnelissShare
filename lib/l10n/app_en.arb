@@ -714,9 +714,13 @@
   "@filesByLinkHint": {
     "description": "Подсказка"
   },
-  "filesByLinkApp": "The recipient is far away: a link by e-mail or in a messenger. They download the files in the Ogneliss Share app while this device is online, within 24 hours.",
+  "filesByLinkApp": "The recipient has Ogneliss Share: a link by e-mail or in a messenger, the files download in the app while this device is online, within 24 hours.",
   "@filesByLinkApp": {
     "description": "Подсказка к способу «по ссылке»"
+  },
+  "filesForApp": "Link for the app",
+  "@filesForApp": {
+    "description": "Способ: ссылка для приложения Ogneliss Share"
   },
   "giveFiles": "Share files",
   "@giveFiles": {
@@ -726,13 +730,59 @@
   "@giveFilesHow": {
     "description": "Заголовок выбора способа"
   },
-  "webQr": "QR code for a browser",
+  "webQr": "No app needed",
   "@webQr": {
     "description": "Способ: скачать в браузере без приложения"
   },
-  "webQrHint": "The recipient is nearby on the same Wi-Fi: points the camera at the code and downloads in the browser. Nothing to install.",
+  "webQrHint": "In a browser: nearby by QR code, far away by link. Nothing to install, the files go directly from this device.",
   "@webQrHint": {
     "description": "Подсказка"
+  },
+  "webModeNear": "Nearby · Wi-Fi",
+  "@webModeNear": {
+    "description": "Переключатель: в локальной сети"
+  },
+  "webModeFar": "Far away · internet",
+  "@webModeFar": {
+    "description": "Переключатель: через интернет"
+  },
+  "webFarScan": "Point the camera at the code or send the link",
+  "@webFarScan": {
+    "description": "Подпись над QR-кодом"
+  },
+  "webSendLink": "Send the link",
+  "@webSendLink": {
+    "description": "Кнопка"
+  },
+  "webFarHint": "The files go directly from this device; ogneliss.ru only helps the two sides find each other. Keep the app open until the download finishes. Some mobile networks do not allow a direct connection — Wi-Fi on either side usually helps.",
+  "@webFarHint": {
+    "description": "Подсказка"
+  },
+  "webFarConnecting": "Preparing the link…",
+  "@webFarConnecting": {
+    "description": "Состояние"
+  },
+  "webFarOffline": "No connection to ogneliss.ru yet — the link will work as soon as there is one.",
+  "@webFarOffline": {
+    "description": "Состояние"
+  },
+  "webMsg": "“{device}” shares files with you: {what}. Download them in a browser, nothing to install (until {until}): {url}",
+  "@webMsg": {
+    "description": "Сообщение со ссылкой",
+    "placeholders": {
+      "device": {
+        "type": "String"
+      },
+      "what": {
+        "type": "String"
+      },
+      "until": {
+        "type": "String"
+      },
+      "url": {
+        "type": "String"
+      }
+    }
   },
   "webTitle": "No app needed",
   "@webTitle": {

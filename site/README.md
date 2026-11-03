@@ -5,6 +5,7 @@
 | `/share/`, `/share/ru/` | описание и скачивание | `share/index.html`, `ru/share/index.html` |
 | `/share/privacy`, `/share/ru/privacy` | политика конфиденциальности (её адрес — в Google Play и App Store) | `share/privacy.html`, `ru/share/privacy.html` |
 | `/share/join/`, `/share/ru/join/` | страница ссылок-приглашений | `share/join.html`, `ru/share/join.html` |
+| `/share/get/`, `/share/ru/get/` | получатель файлов в браузере (`…/get/#<комната>.<ключ>`, WebRTC; `docs/WEB_P2P.md`) | `share/get.html`, `ru/share/get.html` |
 
 Собрать (нужен Pillow):
 
@@ -28,7 +29,7 @@ ogneliss.ru → Advanced), рядом с разделом NumTouch. Без ни�
 Проверка:
 
 ```bash
-for u in share/ share/privacy share/join/ share/ru/ share/ru/privacy share/ru/join/ share/app-icon.png; do
+for u in share/ share/privacy share/join/ share/get/ share/ru/ share/ru/privacy share/ru/join/ share/ru/get/ share/app-icon.png; do
   curl -s -o /dev/null -w "%{http_code} /$u\n" "https://ogneliss.ru/$u?lang=en"
 done
 ```
@@ -36,3 +37,14 @@ done
 Оформление — стили остальных страниц сайта (`style.css.txt`, копия из
 генератора сайта); шапка ведёт на главную ogneliss.ru. Добавить Share в
 меню и на главную сайта — в генераторе самого сайта.
+
+Страница получателя `/share/get/` — единственная со скриптом: `site/get.js` (скрипт) и
+`site/get.css.txt` (стили сверх общих) генератор вставляет прямо в страницу, внешних скриптов
+нет, обращается она только к `/share/api/v1` (служба связи, `server/signal/`) и к STUN. Для
+проверки на своём компьютере адрес службы можно заменить параметром `?api=http://localhost:…/share/api/v1`
+(работает только на localhost). Сверх `docs/WEB_P2P.md` страница шлёт в канал `{"t":"ready"}`, если за секунду после открытия канала не пришло `hello` (Chromium теряет сообщение, посланное в тот же миг, как канал открылся); приложению достаточно в ответ повторить `hello`. Автотест — страница, поддельный отправитель и поддельная служба
+связи в Chromium:
+
+```bash
+node site/test/get_page_test.mjs      # нужны Node 20+ и playwright; снимки экрана — в $SHOT_DIR (по умолчанию /tmp/ogneliss-get-shots)
+```

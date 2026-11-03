@@ -30,6 +30,22 @@ anyhow = "1"
 tokio-util = "0.7"
 fs4 = "1"
 
+# WebRTC для раздачи файлов в браузер (rtc.rs). str0m — без собственного
+# криптопровайдера: его `rust-crypto` через dimpl/rcgen тянет aws-lc-sys,
+# а тот плохо собирается под Android и iOS. Вместо него в rtc.rs свой
+# провайдер: DTLS — dimpl на RustCrypto, сертификат — rcgen поверх ring
+# (ring уже нужен iroh), SRTP не используется (только DataChannel).
+str0m = { version = "0.24", default-features = false }
+dimpl = { version = "0.7", default-features = false, features = ["rust-crypto"] }
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring"] }
+hmac = "0.12"
+sha1 = "0.10"
+sha2 = "0.10"
+# Сообщения через службу связи шифруются AES-256-GCM.
+aes-gcm = "0.10"
+# HTTPS к службе связи: тот же rustls (ring), что и у iroh; корни — webpki-roots.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+
 # Поиск устройств в локальной сети без интернета. На iOS не подключаем:
 # сырой multicast там требует отдельного разрешения Apple
 # (com.apple.developer.networking.multicast).
@@ -48,6 +64,8 @@ libc = ">=0.2.180, <0.2.190"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "fs", "io-util", "net", "test-util"] }
+# Тест HTTPS-клиента rtc.rs: локальный сервер с самоподписанным сертификатом (только ring).
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 
 [profile.release]
 # Размер важен для мобильных: оптимизация по размеру, полная LTO, без

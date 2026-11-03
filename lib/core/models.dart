@@ -353,6 +353,8 @@ class WebShare {
     required this.total,
     required this.names,
     required this.downloads,
+    this.link = '',
+    this.linkStatus = '',
   });
 
   factory WebShare.fromJson(Map<String, dynamic> j) => WebShare(
@@ -364,9 +366,17 @@ class WebShare {
         total: _int(j['total']),
         names: _strings(j['names']),
         downloads: _int(j['downloads']),
+        link: _str(j['link']),
+        linkStatus: _str(j['link_status']),
       );
 
   final String id;
+
+  /// Ссылка через интернет (https://ogneliss.ru/share/get/#…); пусто — выключено.
+  final String link;
+
+  /// connecting — ссылку готовим, ready — работает, offline — нет связи с ogneliss.ru.
+  final String linkStatus;
 
   /// Лучший адрес в локальной сети; пусто — устройство не в Wi-Fi.
   final String url;

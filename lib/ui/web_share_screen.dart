@@ -1,6 +1,7 @@
-// «Без приложения»: большой QR-код с адресом в локальной сети. Получатель
-// наводит камеру, открывает страницу в браузере и скачивает файлы прямо с
-// этого устройства. Ни серверов, ни установки.
+// «Без приложения»: получатель скачивает файлы в браузере прямо с этого
+// устройства. Рядом — QR-код с адресом в локальной сети (без серверов);
+// далеко — ссылка https://ogneliss.ru/share/get/#… (сервер только сводит
+// стороны, файлы идут напрямую по WebRTC).
 
 import 'dart:async';
 
@@ -15,6 +16,7 @@ import '../app/theme.dart';
 import '../core/models.dart';
 import '../core/native.dart';
 import '../l10n/l10n.dart';
+import '../platform/platform_bridge.dart';
 import 'share_link.dart';
 import 'shell.dart';
 import 'widgets.dart';
@@ -53,7 +55,7 @@ Future<void> showGiveFilesSheet(BuildContext context, List<String> paths, {requi
               ),
               ListTile(
                 leading: const Icon(AppIcons.add_link),
-                title: Text(tr.filesByLink),
+                title: Text(tr.filesForApp),
                 subtitle: Text(tr.filesByLinkApp),
                 onTap: () => pick((ctx) => createAndShareLink(ctx, 'files', paths: paths, takeFiles: takeFiles)),
               ),
@@ -96,6 +98,9 @@ class _WebShareScreenState extends State<WebShareScreen> {
   Timer? _clock;
   int _address = 0;
 
+  /// Показан ли способ «далеко» (ссылка через интернет). null — выбрать сам.
+  bool? _far;
+
   /// Последнее известное состояние: после окончания раздачи экран не пустеет.
   WebShare? _last;
 
@@ -126,6 +131,14 @@ class _WebShareScreenState extends State<WebShareScreen> {
     showSnack(tr.copied, duration: const Duration(seconds: 2));
   }
 
+  /// Ссылку — в мессенджер или почту (на Android — системное «Поделиться»).
+  Future<void> _sendLink(WebShare share) async {
+    final me = AppScope.read(context).snapshot.me.name;
+    final text = tr.webMsg(tr.deviceName(me), formatNames(share.names, share.count), formatUntil(share.expires), share.link);
+    if (await PlatformBridge.shareText(tr.msgSubject, text)) return;
+    await _copy(text);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -136,6 +149,12 @@ class _WebShareScreenState extends State<WebShareScreen> {
     final ended = live == null || left <= 0;
     final urls = share?.urls ?? const <String>[];
     final url = urls.isEmpty ? '' : urls[_address % urls.length];
+    final link = share?.link ?? '';
+    // Без Wi-Fi сразу показываем ссылку через интернет.
+    final far = link.isNotEmpty && (_far ?? url.isEmpty);
+    final linkStatus = share?.linkStatus ?? '';
+    final linkReady = linkStatus == 'ready';
+    final downloads = share?.downloads ?? 0;
     final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
 
     return Scaffold(
@@ -157,9 +176,35 @@ class _WebShareScreenState extends State<WebShareScreen> {
                         style: theme.textTheme.titleMedium,
                       ),
                     const SizedBox(height: 16),
+                    if (!ended && link.isNotEmpty) ...[
+                      SegmentedButton<bool>(
+                        segments: [
+                          ButtonSegment(value: false, icon: const Icon(AppIcons.wifi), label: Text(tr.webModeNear)),
+                          ButtonSegment(value: true, icon: const Icon(AppIcons.public), label: Text(tr.webModeFar)),
+                        ],
+                        selected: {far},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (v) => setState(() => _far = v.first),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     if (ended)
                       _Ended(onClose: () => Navigator.of(context).maybePop())
-                    else if (url.isEmpty)
+                    else if (far) ...[
+                      Text(tr.webFarScan, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+                      const SizedBox(height: 12),
+                      _BigQr(data: link),
+                      const SizedBox(height: 12),
+                      Text(
+                        switch (linkStatus) {
+                          'ready' => '${tr.webValid(formatClock(left))} · ${tr.webDownloads(downloads)}',
+                          'offline' => tr.webFarOffline,
+                          _ => tr.webFarConnecting,
+                        },
+                        textAlign: TextAlign.center,
+                        style: muted,
+                      ),
+                    ] else if (url.isEmpty)
                       _NoNetwork(muted: muted)
                     else ...[
                       Text(tr.webScan, style: theme.textTheme.bodyMedium),
@@ -179,7 +224,7 @@ class _WebShareScreenState extends State<WebShareScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text('${tr.webValid(formatClock(left))} · ${tr.webDownloads(share!.downloads)}', style: muted),
+                      Text('${tr.webValid(formatClock(left))} · ${tr.webDownloads(downloads)}', style: muted),
                     ],
                   ],
                 ),
@@ -195,13 +240,25 @@ class _WebShareScreenState extends State<WebShareScreen> {
                 spacing: 12,
                 runSpacing: 8,
                 children: [
-                  if (url.isNotEmpty)
+                  if (far) ...[
+                    FilledButton.icon(
+                      onPressed: linkReady && share != null ? () => _sendLink(share) : null,
+                      icon: const Icon(AppIcons.send),
+                      label: Text(tr.webSendLink),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _copy(link),
+                      icon: const Icon(AppIcons.content_copy),
+                      label: Text(tr.copyLink),
+                    ),
+                  ],
+                  if (!far && url.isNotEmpty)
                     OutlinedButton.icon(
                       onPressed: () => _copy(url),
                       icon: const Icon(AppIcons.content_copy),
                       label: Text(tr.copyLink),
                     ),
-                  if (urls.length > 1)
+                  if (!far && urls.length > 1)
                     OutlinedButton.icon(
                       onPressed: () => setState(() => _address++),
                       icon: const Icon(AppIcons.swap_horiz),
@@ -220,7 +277,7 @@ class _WebShareScreenState extends State<WebShareScreen> {
               maxWidth: 520,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(tr.webSameNetwork, textAlign: TextAlign.center, style: muted),
+                child: Text(far ? tr.webFarHint : tr.webSameNetwork, textAlign: TextAlign.center, style: muted),
               ),
             ),
           ],

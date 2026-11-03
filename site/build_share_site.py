@@ -9,6 +9,7 @@
   share/index.html     /share/           описание и скачивание (английский)
   share/privacy.html   /share/privacy    политика конфиденциальности
   share/join.html      /share/join/      страница ссылки-приглашения
+  share/get.html       /share/get/       страница получателя файлов в браузере
   ru/share/…           /share/ru/…       то же по-русски
   share/app-icon.png, favicon.svg, favicon-32.png, apple-touch-icon.png
 
@@ -17,8 +18,14 @@
 скриптов. Ссылка-приглашение передаётся после «#»: браузер её на сервер не
 отправляет, поэтому страница /share/join/ её не видит и только объясняет,
 что делать.
+
+Единственная страница со скриптом — /share/get/ (docs/WEB_P2P.md): получатель
+файлов в браузере. Её скрипт — site/get.js, стили — site/get.css.txt; всё
+вставляется в саму страницу, внешних скриптов и адресов, кроме службы связи
+и STUN, нет (это проверяет check()).
 """
 import html
+import json
 import re
 import shutil
 import sys
@@ -193,11 +200,134 @@ PRIVACY = {
 ],
 }
 
+# ── Страница получателя /share/get/: тексты. Ключи страницы (PAGE_ONLY) нужны только в HTML, остальные
+# уходят в скрипт get.js как есть. {…} в строках скрипта подставляет сам скрипт. ──
+PAGE_ONLY = ('title', 'desc', 'h1', 'meta', 'noscript')
+GET_T = {
+'en': dict(
+    title='Receive files — Ogneliss Share',
+    desc='Download files straight from another person’s device in your browser — no app needed. Direct and end-to-end encrypted.',
+    h1='Receive files',
+    meta='The files come straight from the sender’s device, encrypted, with no cloud in between.',
+    noscript='This page needs JavaScript to receive files.',
+    connecting='Connecting to the device…',
+    c_wait='Waiting for the device…',
+    c_link='Setting up a direct connection…',
+    device='the device',
+    from_='Files from “{name}”',
+    valid='Link valid for {n} more min',
+    valid_over='The link has expired',
+    download='Download',
+    dl_all='Download all ({count}, {size})',
+    files_n=['file', 'files'],
+    empty='There are no files to download.',
+    cancel='Cancel',
+    p_wait='Requesting the file…',
+    step='File {n} of {total}',
+    of='{done} of {total}',
+    per_s='/s',
+    units=['B', 'KB', 'MB', 'GB'],
+    big='Large file ({size}): this browser has to keep it in memory, so it may fail. Better open this link on a computer.',
+    big_go='Download anyway',
+    done_one='Done — saved: {name}',
+    done_all='Done — saved {count}',
+    cancelled='Download cancelled.',
+    ferr='Could not download “{name}”.',
+    ferr_why=dict(
+        not_found='The file was not found on the device — it may have been moved or deleted.',
+        read='The device could not read the file.',
+        size='The file arrived incomplete. Please try again.',
+        write='The file could not be written to disk. Check the free space and try again.',
+        other='Something went wrong on the device. Please try again.'),
+    retry='Try again',
+    install='Install Ogneliss Share',
+    err=dict(
+        bad=dict(t='The link is wrong or incomplete',
+                 p='Copy the whole link from the message, including everything after the “#” sign, or ask the sender for a new one.'),
+        expired=dict(t='The link has expired',
+                     p='The sender stopped sharing, or the time ran out. Ask them to share the files again.'),
+        silent=dict(t='The device is not responding',
+                    p='Sharing may have been stopped, or the app closed on the sender’s device. Make sure Ogneliss Share is open there and the files are still shared, then try again.'),
+        direct=dict(t='Couldn’t connect directly',
+                    p='The files go straight from the sender’s device, and this time a direct path could not be found. You can try:',
+                    tips=['Open the link on a device connected to the same Wi-Fi network as the sender.',
+                          'Switch the network: use mobile data instead of Wi-Fi, or Wi-Fi instead of mobile data.',
+                          'Or install Ogneliss Share on this device.']),
+        lost=dict(t='Connection lost',
+                  p='The connection to the device was interrupted. The sender may have stopped sharing, closed the app or changed networks. You can try again.'),
+        net=dict(t='Can’t reach the server',
+                 p='Check your internet connection and try again.'),
+        busy=dict(t='Too many attempts',
+                  p='Please wait a minute and try again.'),
+        unsupported=dict(t='This browser can’t receive files',
+                         p='The page needs WebRTC and encryption support, which work only over a secure (https) connection. Open the link in a recent version of Chrome, Firefox, Safari or Edge.')),
+),
+'ru': dict(
+    title='Получение файлов — Ogneliss Share',
+    desc='Скачайте файлы прямо с устройства другого человека в браузере, без установки приложения: напрямую и со сквозным шифрованием.',
+    h1='Получение файлов',
+    meta='Файлы идут прямо с устройства отправителя, с шифрованием и без облака.',
+    noscript='Для получения файлов странице нужен JavaScript.',
+    connecting='Подключаемся к устройству…',
+    c_wait='Ждём ответа устройства…',
+    c_link='Устанавливаем прямое соединение…',
+    device='устройство',
+    from_='Файлы с устройства «{name}»',
+    valid='Ссылка действует ещё {n} мин',
+    valid_over='Ссылка перестала действовать',
+    download='Скачать',
+    dl_all='Скачать всё ({count}, {size})',
+    files_n=['файл', 'файла', 'файлов'],
+    empty='Нет файлов для скачивания.',
+    cancel='Отмена',
+    p_wait='Запрашиваем файл…',
+    step='Файл {n} из {total}',
+    of='{done} из {total}',
+    per_s='/с',
+    units=['Б', 'КБ', 'МБ', 'ГБ'],
+    big='Большой файл ({size}): этот браузер держит его в памяти и может не справиться. Лучше открыть ссылку на компьютере.',
+    big_go='Всё равно скачать',
+    done_one='Готово — сохранён файл: {name}',
+    done_all='Готово — сохранено: {count}',
+    cancelled='Скачивание отменено.',
+    ferr='Не удалось скачать «{name}».',
+    ferr_why=dict(
+        not_found='Файл не найден на устройстве — возможно, его переместили или удалили.',
+        read='Устройство не смогло прочитать файл.',
+        size='Файл пришёл не полностью. Попробуйте ещё раз.',
+        write='Не удалось записать файл на диск. Проверьте свободное место и попробуйте ещё раз.',
+        other='На устройстве что-то пошло не так. Попробуйте ещё раз.'),
+    retry='Попробовать снова',
+    install='Установить Ogneliss Share',
+    err=dict(
+        bad=dict(t='Ссылка неверна или неполная',
+                 p='Скопируйте ссылку из сообщения целиком, со всем, что стоит после знака «#», или попросите отправителя прислать новую.'),
+        expired=dict(t='Ссылка устарела',
+                     p='Отправитель остановил раздачу, или время вышло. Попросите его отдать файлы снова.'),
+        silent=dict(t='Устройство не отвечает',
+                    p='Возможно, раздачу остановили или приложение на устройстве отправителя закрыто. Проверьте, что Ogneliss Share там открыт и файлы ещё раздаются, и попробуйте снова.'),
+        direct=dict(t='Не удалось соединиться напрямую',
+                    p='Файлы идут прямо с устройства отправителя, а прямой путь на этот раз найти не удалось. Что можно сделать:',
+                    tips=['Откройте ссылку на устройстве, подключённом к той же сети Wi-Fi, что и отправитель.',
+                          'Смените сеть: мобильный интернет вместо Wi-Fi или Wi-Fi вместо мобильного интернета.',
+                          'Или установите Ogneliss Share на это устройство.']),
+        lost=dict(t='Соединение потеряно',
+                  p='Связь с устройством прервалась. Возможно, отправитель остановил раздачу, закрыл приложение или сменил сеть. Можно попробовать снова.'),
+        net=dict(t='Нет связи с сервером',
+                 p='Проверьте подключение к интернету и попробуйте снова.'),
+        busy=dict(t='Слишком много попыток',
+                  p='Подождите минуту и попробуйте снова.'),
+        unsupported=dict(t='Браузер не умеет принимать файлы',
+                         p='Странице нужны WebRTC и шифрование, а они работают только по защищённому соединению (https). Откройте ссылку в свежей версии Chrome, Firefox, Safari или Edge.')),
+),
+}
+
 
 def url(lang, page):
-    """page: index | privacy | join."""
+    """page: index | privacy | join | get."""
     l = '' if lang == 'en' else f'{lang}/'
-    return {'index': f'/share/{l}', 'privacy': f'/share/{l}privacy', 'join': f'/share/{l}join/'}[page]
+    return {'index': f'/share/{l}', 'privacy': f'/share/{l}privacy', 'join': f'/share/{l}join/',
+            'get': f'/share/{l}get/'}[page]
 
 
 def out_file(lang, page):
@@ -205,10 +335,23 @@ def out_file(lang, page):
     return f'{l}share/{page}.html'
 
 
-CSS = re.sub(r'\s*\n\s*', '', re.sub(r'/\*.*?\*/', '', (HERE / 'style.css.txt').read_text(encoding='utf-8'), flags=re.S))
 
 
-def page(lang, pg, title, desc, body, noindex=False):
+def minify_css(text):
+    return re.sub(r'\s*\n\s*', '', re.sub(r'/\*.*?\*/', '', text, flags=re.S))
+
+
+CSS = minify_css((HERE / 'style.css.txt').read_text(encoding='utf-8'))
+GET_CSS = minify_css((HERE / 'get.css.txt').read_text(encoding='utf-8'))
+# Единственное правило с display:none в странице получателя — для атрибута hidden; check() его пропускает.
+HIDDEN_RULE = '[hidden]{display:none !important}'
+# Страница получателя может обращаться только к своему серверу (службе связи); для проверки на своём
+# компьютере (?api=) — ещё и к localhost. STUN идёт мимо CSP (это не HTTP).
+GET_CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; "
+           "connect-src 'self' http://localhost:* http://127.0.0.1:*; base-uri 'none'; form-action 'none'")
+
+
+def page(lang, pg, title, desc, body, noindex=False, head='', css='', tail=''):
     t = T[lang]
     alts = '\n'.join(f'<link rel="alternate" hreflang="{l}" href="{BASE}{url(l, pg)}">' for l in LANGS)
     langs = ''.join(f'<a href="{url(l, pg)}" hreflang="{l}" lang="{l}"' + (' aria-current="true"' if l == lang else '')
@@ -222,7 +365,7 @@ def page(lang, pg, title, desc, body, noindex=False):
 <!-- Generated by site/build_share_site.py (OgnelissShare repository). -->
 <title>{html.escape(title)}</title>
 <meta name="description" content="{html.escape(desc)}">
-{robots}<link rel="canonical" href="{BASE}{url(lang, pg)}">
+{robots}{head}<link rel="canonical" href="{BASE}{url(lang, pg)}">
 {alts}
 <link rel="alternate" hreflang="x-default" href="{BASE}{url('en', pg)}">
 <link rel="icon" href="/share/favicon.svg" type="image/svg+xml">
@@ -232,7 +375,7 @@ def page(lang, pg, title, desc, body, noindex=False):
 <meta property="og:description" content="{html.escape(desc)}">
 <meta property="og:url" content="{BASE}{url(lang, pg)}">
 <meta property="og:type" content="website">
-<style>{CSS}</style>
+<style>{CSS}{css}</style>
 </head>
 <body>
 <header class="bar">
@@ -254,7 +397,7 @@ def page(lang, pg, title, desc, body, noindex=False):
 <div class="bottom"><span>© 2026 {OWNER[lang]}</span><span><a href="{'/' if lang == 'en' else f'/{lang}/'}">ogneliss.ru</a></span></div>
 </div>
 </footer>
-</body>
+{tail}</body>
 </html>
 '''
 
@@ -383,6 +526,66 @@ def join(lang):
     return page(lang, 'join', t['join_title'], t['join_desc'], body, noindex=True)
 
 
+def get_script(lang):
+    """Скрипт страницы получателя: site/get.js без комментариев на отдельных строках, со строками языка."""
+    g = {k: v for k, v in GET_T[lang].items() if k not in PAGE_ONLY}
+    strings = json.dumps(g, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c')
+    js = (HERE / 'get.js').read_text(encoding='utf-8')
+    js = re.sub(r'/\*.*?\*/', '', js, flags=re.S)
+    js = re.sub(r'^[ \t]*//.*\n', '', js, flags=re.M)
+    js = re.sub(r'(?<=\S)[ \t]+// .*$', '', js, flags=re.M)
+    js = re.sub(r'\n\s*\n', '\n', js).strip()
+    return js.replace('__LANG__', lang).replace('__STRINGS__', strings)
+
+
+def get(lang):
+    g = GET_T[lang]
+    e = html.escape
+    body = f'''<section class="hero doc-head">
+<div class="wrap narrow">
+<div class="crumbs"><a href="{'/' if lang == 'en' else f'/{lang}/'}">Ogneliss</a> › <a href="{url(lang, 'index')}">Ogneliss Share</a></div>
+<h1>{e(g['h1'])}</h1>
+<p class="meta">{e(g['meta'])}</p>
+</div>
+</section>
+<div class="wrap narrow">
+<noscript><div class="note"><p>{e(g['noscript'])}</p></div></noscript>
+<div class="rx" id="rx" hidden>
+<section class="panel" id="v-connect" aria-live="polite">
+<div class="spin" aria-hidden="true"></div>
+<p class="big" id="c-title">{e(g['connecting'])}</p>
+<p class="mu" id="c-sub">{e(g['c_wait'])}</p>
+</section>
+<section id="v-list" hidden>
+<p class="sub" id="l-from"></p>
+<p class="mu" id="l-valid"></p>
+<div class="prog" id="l-prog" hidden>
+<p class="step" id="p-step"></p>
+<div class="n" id="p-name"></div>
+<div class="pb" id="p-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="p-fill"></i></div>
+<div class="s" id="p-text"></div>
+<button type="button" class="b t" id="p-cancel">{e(g['cancel'])}</button>
+</div>
+<div class="note" id="l-note" role="status" hidden><p id="l-note-text"></p></div>
+<div class="note" id="l-warn" data-k="warn" hidden><p id="l-warn-text"></p><button type="button" class="b" id="warn-go">{e(g['big_go'])}</button><button type="button" class="b t" id="warn-no">{e(g['cancel'])}</button></div>
+<button type="button" class="b z" id="l-all" hidden></button>
+<ul class="files" id="l-files"></ul>
+<p class="mu" id="l-empty" hidden>{e(g['empty'])}</p>
+</section>
+<section class="panel" id="v-error" role="alert" hidden>
+<h2 id="e-title"></h2>
+<p id="e-text"></p>
+<ul id="e-tips"></ul>
+<button type="button" class="b" id="e-retry">{e(g['retry'])}</button>
+<a class="b t" id="e-install" href="{url(lang, 'index')}">{e(g['install'])}</a>
+</section>
+</div>
+</div>'''
+    head = f'<meta http-equiv="Content-Security-Policy" content="{GET_CSP}">\n<meta name="referrer" content="no-referrer">\n'
+    return page(lang, 'get', g['title'], g['desc'], body, noindex=True, head=head, css=GET_CSS,
+                tail=f'<script>\n{get_script(lang)}\n</script>\n')
+
+
 def icons():
     d = OUT / 'share'
     d.mkdir(parents=True, exist_ok=True)
@@ -396,10 +599,18 @@ def icons():
 
 def check(out):
     bad = []
-    known = {url(l, p) for l in LANGS for p in ('index', 'privacy', 'join')}
+    known = {url(l, p) for l in LANGS for p in ('index', 'privacy', 'join', 'get')}
     assets = {'/share/app-icon.png', '/share/favicon.svg', '/share/favicon-32.png', '/share/apple-touch-icon.png',
               '/dialer/logo.svg', '/', '/ru/'}
     for path, text in out.items():
+        if path.endswith('/get.html'):
+            # Страница получателя: ровно один встроенный скрипт, без внешних адресов (STUN — не http).
+            code = re.findall(r'<script>(.*?)</script>', text, flags=re.S)
+            if len(code) != 1:
+                bad.append(f'{path}: скриптов должно быть ровно один')
+            elif re.search(r'(?:https?|wss?)://', code[0]):
+                bad.append(f'{path}: внешний адрес в скрипте')
+            text = re.sub(r'<script>.*?</script>', '', text, flags=re.S).replace(HIDDEN_RULE, '')
         if re.search(r'<script|display:\s*none', re.sub(r'<!--.*?-->', '', text, flags=re.S)):
             bad.append(f'{path}: скрипт или скрытый блок')
         if text.count('<h1') != 1:
@@ -424,6 +635,7 @@ def main():
         out[out_file(l, 'index')] = index(l)
         out[out_file(l, 'privacy')] = privacy(l)
         out[out_file(l, 'join')] = join(l)
+        out[out_file(l, 'get')] = get(l)
     for path, text in out.items():
         p = OUT / path
         p.parent.mkdir(parents=True, exist_ok=True)

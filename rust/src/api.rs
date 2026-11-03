@@ -210,6 +210,7 @@ fn init(v: &Value) -> Result<Value> {
         platform,
         relays: Relays::from_build(),
         mdns: true,
+        rtc: Some(crate::rtc::RtcConfig::default()),
     };
     let started =
         runtime().block_on(async { tokio::time::timeout(Duration::from_secs(20), Node::start(cfg)).await });

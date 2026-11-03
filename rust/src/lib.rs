@@ -12,6 +12,7 @@ pub mod events;
 pub mod node;
 pub mod pairing;
 pub mod proto;
+pub mod rtc;
 pub mod store;
 pub mod transfer;
 pub mod util;

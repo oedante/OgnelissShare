@@ -21,6 +21,7 @@ async fn make_node(name: &str) -> (Arc<Node>, PathBuf) {
         platform: "linux".into(),
         relays: Relays::Disabled,
         mdns: false,
+        rtc: None,
     };
     let node = Node::start(cfg).await.expect("start");
     for _ in 0..100 {

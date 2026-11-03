@@ -1,0 +1,55 @@
+/* Страница получателя /share/get/ — добавляется к style.css.txt после общих стилей.
+   Цвета — как у страницы раздачи в локальной сети (rust/src/web.rs): синий #1D4F91, фон #F2F5F9,
+   карточки с радиусом 16px, крупные кнопки на всю ширину; в тёмной теме #9DBDEB, #12161B, #1D232B. */
+:root{--bg:#F2F5F9;--accent:#1D4F91;--accent-hover:#163F75;--tb:#D9E5F6;--tt:#0B2545;--ok:#1E7A46;--err:#B3261E;--warn:#9A5B00}
+@media (prefers-color-scheme:dark){:root{--bg:#12161B;--card:#1D232B;--accent:#9DBDEB;--accent-hover:#B6CEF0;--on-accent:#12161B;
+--tb:#233E63;--tt:#D9E5F6;--ok:#7FD1A0;--err:#F2A7A1;--warn:#F0C27A}}
+[hidden]{display:none !important}
+.rx{max-width:640px;padding:24px 0 8px}
+.rx p{margin:0 0 12px}
+.rx .sub{margin:0 0 4px;font-size:18px;font-weight:600;overflow-wrap:anywhere}
+.rx .mu{margin:0 0 16px;color:var(--sub);font-size:14px}
+/* состояния: подключение и ошибка */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px 20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+#v-connect{text-align:center}
+#v-connect .big{font-size:19px;font-weight:600;margin:0 0 6px}
+#v-connect .mu{margin:0}
+#v-error{border-left:4px solid var(--err)}
+#v-error h2{font-size:21px;line-height:1.3;margin:0 0 10px}
+#v-error ul{margin:0 0 16px;padding-left:22px}
+#v-error .b + .b{margin-top:10px}
+#v-error p:last-of-type{margin-bottom:16px}
+.spin{width:44px;height:44px;margin:0 auto 18px;border:4px solid var(--tb);border-top-color:var(--accent);border-radius:50%;animation:rxspin 1s linear infinite}
+@keyframes rxspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:4s}}
+/* крупные кнопки */
+.rx .b{display:block;width:100%;padding:14px;border:0;border-radius:12px;background:var(--accent);color:var(--on-accent);
+font:inherit;font-weight:600;text-align:center;text-decoration:none;cursor:pointer;-webkit-appearance:none;appearance:none;touch-action:manipulation}
+.rx .b:hover{background:var(--accent-hover)}
+.rx .b.t{background:var(--tb);color:var(--tt)}
+.rx .b.t:hover{background:var(--tb);filter:brightness(.96)}
+.rx .b:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.rx .b:disabled{opacity:.45;cursor:default;filter:none}
+.rx .z{margin:0 0 16px;padding:18px 14px;font-size:17px}
+/* список файлов */
+.rx ul.files{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:12px}
+.rx ul.files li{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.rx .n{font-weight:600;overflow-wrap:anywhere}
+.rx .s{margin:2px 0 12px;color:var(--sub);font-size:14px;overflow-wrap:anywhere}
+/* ход загрузки и сообщения */
+.rx .prog{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:0 0 16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.rx .prog .step{margin:0 0 2px;color:var(--sub);font-size:14px}
+.rx .prog .s{margin:0}
+.rx .prog .b{margin-top:14px}
+.pb{height:10px;border-radius:5px;background:var(--tb);overflow:hidden;margin:12px 0 8px}
+.pb i{display:block;height:100%;width:0;border-radius:5px;background:var(--accent);transition:width .2s}
+.rx .note{border-radius:12px;margin:0 0 16px;overflow-wrap:anywhere}
+.rx .note[data-k="ok"]{border-left-color:var(--ok)}
+.rx .note[data-k="err"]{border-left-color:var(--err)}
+.rx .note[data-k="warn"]{border-left-color:var(--warn)}
+.rx .note .b{margin-top:10px}
+.rx .note p + .b{margin-top:14px}
+@media (max-width:640px){
+.rx{padding-top:18px}
+.panel{padding:24px 16px}
+}
