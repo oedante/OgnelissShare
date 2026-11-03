@@ -1,0 +1,12 @@
+<ru-RU>
+Новое в Ogneliss Share 1.4:
+• файлы без приложения и через интернет: отправьте ссылку — получатель скачает файлы в браузере прямо с вашего устройства, сервер только помогает соединиться
+• рядом по-прежнему QR-код в той же Wi-Fi, вовсе без серверов
+• несколько файлов — одним архивом
+</ru-RU>
+<en-US>
+New in Ogneliss Share 1.4:
+• files without the app, over the internet too: send a link and the recipient downloads the files in a browser straight from your device; the server only helps to connect
+• nearby, a QR code on the same Wi-Fi still works with no servers at all
+• several files as one archive
+</en-US>
