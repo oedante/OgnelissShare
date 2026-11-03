@@ -1,4 +1,4 @@
-//! Запуск службы связи: `LISTEN` (по умолчанию `0.0.0.0:8080`).
+//! Запуск службы связи: `LISTEN` (по умолчанию `0.0.0.0:8789`).
 
 use std::net::SocketAddr;
 use std::process::ExitCode;
@@ -9,7 +9,7 @@ use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let listen = std::env::var("LISTEN").unwrap_or_else(|_| "0.0.0.0:8080".into());
+    let listen = std::env::var("LISTEN").unwrap_or_else(|_| "0.0.0.0:8789".into());
     let listener = match TcpListener::bind(&listen).await {
         Ok(l) => l,
         Err(e) => {

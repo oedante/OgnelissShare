@@ -273,7 +273,7 @@ impl IntoResponse for ApiError {
 pub fn router(state: Arc<AppState>) -> Router {
     let limit = middleware::from_fn_with_state(state.clone(), rate_limit);
     let api = Router::new()
-        .route("/health", get(health))
+        .route("/healthz", get(healthz))
         .route("/rooms/{room}", put(put_room).layer(limit.clone()).delete(delete_room))
         .route("/rooms/{room}/offers", post(post_offer).layer(limit).get(get_offers))
         .route("/rooms/{room}/answers/{sid}", put(put_answer).get(get_answer))
@@ -385,8 +385,9 @@ struct PollQuery {
     wait: Option<u64>,
 }
 
-async fn health() -> &'static str {
-    "ok"
+/// `GET /healthz`: для мониторинга и установщика; число комнат — только счётчик.
+async fn healthz(State(s): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    Json(json!({ "ok": true, "rooms": s.rooms() }))
 }
 
 /// `PUT /rooms/{room}`: создать комнату или продлить свою.

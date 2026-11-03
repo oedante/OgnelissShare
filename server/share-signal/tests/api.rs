@@ -95,11 +95,14 @@ fn now_unix() -> u64 {
 }
 
 #[tokio::test]
-async fn health_ok_and_no_store() {
+async fn healthz_reports_ok_and_room_count() {
     let (app, _) = app();
-    let r = send(&app, "GET", "/health", &[], "").await;
+    let r = send(&app, "GET", "/healthz", &[], "").await;
     assert_eq!(r.status, StatusCode::OK);
-    assert_eq!(r.body, b"ok");
+    assert_eq!(r.json(), json!({"ok": true, "rooms": 0}));
+    create_room(&app, ROOM, OWNER).await;
+    let r = send(&app, "GET", "/healthz", &[], "").await;
+    assert_eq!(r.json(), json!({"ok": true, "rooms": 1}));
     assert_eq!(r.headers["cache-control"], "no-store");
 }
 
@@ -609,7 +612,7 @@ async fn shutdown_releases_waiting_polls() {
 async fn unknown_route_and_method() {
     let (app, _) = app();
     assert_eq!(send(&app, "GET", "/nope", &[], "").await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send(&app, "POST", "/health", &[], "").await.status, StatusCode::METHOD_NOT_ALLOWED);
-    let r = run(&app, Request::get("/health").body(Body::empty()).unwrap()).await;
+    assert_eq!(send(&app, "POST", "/healthz", &[], "").await.status, StatusCode::METHOD_NOT_ALLOWED);
+    let r = run(&app, Request::get("/healthz").body(Body::empty()).unwrap()).await;
     assert_eq!(r.status, StatusCode::NOT_FOUND, "без префикса /share/api/v1 маршрутов нет");
 }

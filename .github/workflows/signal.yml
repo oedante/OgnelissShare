@@ -1,16 +1,16 @@
-# Служба связи для ссылок «без приложения» (server/signal, docs/WEB_P2P.md):
-# проверки и сборка образа Docker. Образ никуда не загружается — на сервере
-# его собирают из исходников (server/signal/README.md); здесь проверяем, что
-# Dockerfile собирается.
+# Служба связи для ссылок «без приложения» (server/share-signal, docs/WEB_P2P.md):
+# проверки, установщик и сборка образа Docker. Образ никуда не загружается — на
+# сервере его собирает install-share-signal.sh из исходников; здесь проверяем,
+# что Dockerfile собирается и служба отвечает.
 
 name: Служба связи
 
 on:
   push:
     branches: ['**']
-    paths: ['server/signal/**', '.github/workflows/signal.yml']
+    paths: ['server/share-signal/**', '.github/workflows/signal.yml']
   pull_request:
-    paths: ['server/signal/**']
+    paths: ['server/share-signal/**']
   workflow_dispatch:
 
 concurrency:
@@ -27,21 +27,28 @@ jobs:
       - name: Rust stable
         run: rustup update stable && rustup default stable && rustup component add clippy
       - name: Тесты
-        working-directory: server/signal
+        working-directory: server/share-signal
         run: cargo test --locked
       - name: Clippy
-        working-directory: server/signal
+        working-directory: server/share-signal
         run: cargo clippy --all-targets --locked -- -D warnings
-      - name: Образ Docker
-        working-directory: server/signal
+      - name: Установщик (синтаксис и shellcheck)
+        working-directory: server/share-signal
         run: |
-          docker build -t ogneliss-signal .
-          docker run -d --name sig -p 18080:8080 ogneliss-signal
+          bash -n install-share-signal.sh
+          if command -v shellcheck >/dev/null; then shellcheck install-share-signal.sh; fi
+      - name: Образ Docker
+        working-directory: server/share-signal
+        run: |
+          docker build -t ogneliss/share-signal:latest .
+          docker run -d --name sig -p 18789:8789 ogneliss/share-signal:latest
           ok=0
           for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:18080/share/api/v1/health; then ok=1; break; fi
+            if curl -fsS http://127.0.0.1:18789/share/api/v1/healthz | tee /dev/stderr | grep -q '"ok":true'; then ok=1; break; fi
             sleep 0.5
           done
           [ "$ok" = 1 ] || { docker logs sig; exit 1; }
-          docker images ogneliss-signal --format 'Размер образа: {{.Size}}'
+          # Проверка здоровья в compose и установщике ходит через wget из busybox.
+          docker exec sig wget -qO- http://127.0.0.1:8789/share/api/v1/healthz | grep -q '"ok":true'
+          docker images ogneliss/share-signal --format 'Размер образа: {{.Size}}'
           docker rm -f sig
